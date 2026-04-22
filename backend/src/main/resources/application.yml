@@ -1,0 +1,53 @@
+server:
+  address: 127.0.0.1
+  port: 0
+  shutdown: graceful
+
+spring:
+  application:
+    name: adm-backend
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+        show_sql: false
+  datasource:
+    url: jdbc:sqlite:${user.home}/.adm/adm.sqlite
+    driver-class-name: org.sqlite.JDBC
+  quartz:
+    job-store-type: memory
+
+adm:
+  downloads:
+    root: ${user.home}/Downloads/ADM
+    default-segments: 8
+    max-segments: 32
+    retry:
+      max-attempts: 5
+      initial-delay-ms: 500
+      max-delay-ms: 30000
+  torrent:
+    enabled: true
+    dht-enabled: true
+    lsd-enabled: true
+    upnp-enabled: true
+    listen-port: 0
+  security:
+    token-header: X-Adm-Token
+  categorizer:
+    enabled: true
+    folders:
+      Compressed: [zip, rar, 7z, tar, gz, bz2, xz, tgz, tbz, tbz2, txz]
+      Documents: [pdf, doc, docx, xls, xlsx, ppt, pptx, txt, rtf, odt, epub, csv, md]
+      Music: [mp3, flac, wav, ogg, m4a, aac, wma, opus]
+      Video: [mp4, mkv, avi, mov, webm, flv, wmv, m4v, mpg, mpeg]
+      Programs: [exe, msi, pkg, dmg, deb, rpm, appimage, apk]
+
+logging:
+  level:
+    root: INFO
+    com.azrael.adm: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"
