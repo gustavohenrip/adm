@@ -14,10 +14,10 @@ A modern, cross-platform download manager combining the strengths of IDM (dynami
 
 ## Stack
 
-- **Frontend**: Angular + TypeScript, packaged in Electron.
-- **Backend**: Spring Boot (Java 17+) running as sidecar process.
-- **Communication**: REST + WebSocket (STOMP) over `127.0.0.1` with per-session token.
-- **Persistence**: SQLite via JPA.
+- **Frontend**: Angular 18 + TypeScript, shipped inside Electron.
+- **Backend**: Spring Boot 3.3 (Java 17+) running as a sidecar process.
+- **Communication**: REST + WebSocket (STOMP) bound to `127.0.0.1` with a per-session token.
+- **Persistence**: SQLite via JPA/Hibernate.
 - **Torrent**: jlibtorrent.
 
 ## Platforms
@@ -26,9 +26,24 @@ A modern, cross-platform download manager combining the strengths of IDM (dynami
 - Windows (x86_64)
 - Linux (x86_64) — AppImage, deb, rpm
 
-## Status
+## Development
 
-Early development. See release history for progress.
+```
+# backend
+cd backend && ./gradlew bootRun
+
+# frontend
+cd frontend && npm install && npm start
+
+# electron shell (points to http://localhost:4200)
+cd electron && npm install && npm run dev
+```
+
+The backend prints an `ADM_READY port=... token=...` line on stdout once listening. Electron parses that line in production; in dev you can pass the port and token through `ADM_BACKEND_PORT` and `ADM_BACKEND_TOKEN`.
+
+## Release
+
+Push a `v*.*.*` tag to trigger the release workflow that builds `.dmg`, `.exe`, `.AppImage`, `.deb`, and `.rpm` installers and attaches them to a GitHub Release.
 
 ## License
 
