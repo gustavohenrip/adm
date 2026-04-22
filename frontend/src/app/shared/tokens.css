@@ -1,0 +1,78 @@
+:root[data-theme="light"] {
+  --bg-base: oklch(0.975 0.003 80);
+  --bg-wash-1: oklch(0.92 0.006 80 / 0.55);
+  --bg-wash-2: oklch(0.90 0.004 240 / 0.35);
+
+  --text: oklch(0.22 0.005 260);
+  --text-dim: oklch(0.46 0.005 260);
+  --text-subtle: oklch(0.62 0.004 260);
+  --text-inverse: oklch(0.985 0 0);
+
+  --glass: oklch(1 0 0 / 0.55);
+  --glass-hi: oklch(1 0 0 / 0.72);
+  --glass-border: oklch(1 0 0 / 0.85);
+  --glass-border-2: oklch(0.30 0.005 260 / 0.09);
+  --hairline: oklch(0.30 0.005 260 / 0.07);
+
+  --chip: oklch(1 0 0 / 0.65);
+  --chip-border: oklch(0.30 0.005 260 / 0.08);
+  --selection: oklch(0.30 0.005 260 / 0.06);
+
+  --track: oklch(0.30 0.005 260 / 0.08);
+  --fill: oklch(0.22 0.005 260);
+  --fill-muted: oklch(0.55 0.005 260);
+
+  --shadow:
+    0 30px 80px -30px oklch(0.20 0 0 / 0.22),
+    0 0 0 1px oklch(0.30 0.005 260 / 0.04) inset;
+
+  --gloss-top: oklch(1 0 0 / 0.95);
+  --grain-opacity: 0.25;
+  --grain-blend: multiply;
+}
+
+:root[data-theme="dark"] {
+  --bg-base: oklch(0.14 0.005 260);
+  --bg-wash-1: oklch(0.28 0.008 260 / 0.55);
+  --bg-wash-2: oklch(0.22 0.005 260 / 0.45);
+
+  --text: oklch(0.97 0.003 260);
+  --text-dim: oklch(0.72 0.006 260);
+  --text-subtle: oklch(0.52 0.006 260);
+  --text-inverse: var(--bg-base);
+
+  --glass: oklch(1 0 0 / 0.045);
+  --glass-hi: oklch(1 0 0 / 0.08);
+  --glass-border: oklch(1 0 0 / 0.10);
+  --glass-border-2: oklch(1 0 0 / 0.16);
+  --hairline: oklch(1 0 0 / 0.06);
+
+  --chip: oklch(1 0 0 / 0.05);
+  --chip-border: oklch(1 0 0 / 0.10);
+  --selection: oklch(1 0 0 / 0.10);
+
+  --track: oklch(1 0 0 / 0.08);
+  --fill: oklch(0.95 0.003 260);
+  --fill-muted: oklch(0.65 0.005 260);
+
+  --shadow:
+    0 30px 80px -30px oklch(0 0 0 / 0.7),
+    0 0 0 1px oklch(1 0 0 / 0.04) inset;
+
+  --gloss-top: oklch(1 0 0 / 0.30);
+  --grain-opacity: 0.35;
+  --grain-blend: overlay;
+}
+
+:root {
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --blur-glass: blur(44px) saturate(150%);
+}
