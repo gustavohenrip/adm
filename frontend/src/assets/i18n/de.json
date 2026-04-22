@@ -1,7 +1,5 @@
 {
-  "app": {
-    "name": "Azrael"
-  },
+  "app": { "name": "Azrael" },
   "nav": {
     "all": "Alle",
     "active": "Aktiv",
@@ -21,9 +19,7 @@
     "more": "Mehr",
     "settings": "Einstellungen"
   },
-  "sidebar": {
-    "sessionSpeed": "Sitzungsgeschwindigkeit"
-  },
+  "sidebar": { "sessionSpeed": "Sitzungsgeschwindigkeit" },
   "queue": {
     "columns": {
       "name": "Name",
@@ -44,5 +40,22 @@
     "queued": "in Warteschlange",
     "complete": "abgeschlossen",
     "failed": "fehlgeschlagen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "appearance": "Darstellung",
+    "theme": "Design",
+    "language": "Sprache",
+    "downloads": "Downloads",
+    "downloadRoot": "Download-Ordner",
+    "defaultSegments": "Standard-Segmente",
+    "rateLimit": "Globale Geschwindigkeitsgrenze",
+    "network": "Netzwerk",
+    "proxy": "Proxy",
+    "system": "System",
+    "clipboard": "URLs aus Zwischenablage erkennen",
+    "tray": "Symbol im Benachrichtigungsbereich",
+    "autoUpdate": "Automatische Aktualisierung",
+    "save": "Änderungen speichern"
   }
 }

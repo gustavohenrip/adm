@@ -1,7 +1,5 @@
 {
-  "app": {
-    "name": "Azrael"
-  },
+  "app": { "name": "Azrael" },
   "nav": {
     "all": "الكل",
     "active": "نشطة",
@@ -21,9 +19,7 @@
     "more": "المزيد",
     "settings": "الإعدادات"
   },
-  "sidebar": {
-    "sessionSpeed": "سرعة الجلسة"
-  },
+  "sidebar": { "sessionSpeed": "سرعة الجلسة" },
   "queue": {
     "columns": {
       "name": "الاسم",
@@ -44,5 +40,22 @@
     "queued": "في الطابور",
     "complete": "مكتمل",
     "failed": "فشل"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "appearance": "المظهر",
+    "theme": "السمة",
+    "language": "اللغة",
+    "downloads": "التنزيلات",
+    "downloadRoot": "مجلد التنزيلات",
+    "defaultSegments": "عدد المقاطع الافتراضي",
+    "rateLimit": "الحد العالمي للسرعة",
+    "network": "الشبكة",
+    "proxy": "بروكسي",
+    "system": "النظام",
+    "clipboard": "كشف الروابط في الحافظة",
+    "tray": "إظهار الأيقونة في الشريط",
+    "autoUpdate": "التحديث التلقائي",
+    "save": "حفظ التغييرات"
   }
 }

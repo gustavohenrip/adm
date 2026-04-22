@@ -1,7 +1,5 @@
 {
-  "app": {
-    "name": "Azrael"
-  },
+  "app": { "name": "Azrael" },
   "nav": {
     "all": "全部",
     "active": "进行中",
@@ -21,9 +19,7 @@
     "more": "更多",
     "settings": "设置"
   },
-  "sidebar": {
-    "sessionSpeed": "会话速度"
-  },
+  "sidebar": { "sessionSpeed": "会话速度" },
   "queue": {
     "columns": {
       "name": "名称",
@@ -44,5 +40,22 @@
     "queued": "队列中",
     "complete": "已完成",
     "failed": "失败"
+  },
+  "settings": {
+    "title": "设置",
+    "appearance": "外观",
+    "theme": "主题",
+    "language": "语言",
+    "downloads": "下载",
+    "downloadRoot": "下载文件夹",
+    "defaultSegments": "默认分段数",
+    "rateLimit": "全局速度限制",
+    "network": "网络",
+    "proxy": "代理",
+    "system": "系统",
+    "clipboard": "检测剪贴板中的链接",
+    "tray": "显示托盘图标",
+    "autoUpdate": "自动更新",
+    "save": "保存更改"
   }
 }

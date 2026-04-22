@@ -1,7 +1,5 @@
 {
-  "app": {
-    "name": "Azrael"
-  },
+  "app": { "name": "Azrael" },
   "nav": {
     "all": "すべて",
     "active": "実行中",
@@ -21,9 +19,7 @@
     "more": "その他",
     "settings": "設定"
   },
-  "sidebar": {
-    "sessionSpeed": "セッションの速度"
-  },
+  "sidebar": { "sessionSpeed": "セッションの速度" },
   "queue": {
     "columns": {
       "name": "名前",
@@ -44,5 +40,22 @@
     "queued": "待機中",
     "complete": "完了",
     "failed": "失敗"
+  },
+  "settings": {
+    "title": "設定",
+    "appearance": "外観",
+    "theme": "テーマ",
+    "language": "言語",
+    "downloads": "ダウンロード",
+    "downloadRoot": "ダウンロード先フォルダ",
+    "defaultSegments": "既定のセグメント数",
+    "rateLimit": "全体の速度制限",
+    "network": "ネットワーク",
+    "proxy": "プロキシ",
+    "system": "システム",
+    "clipboard": "クリップボードの URL を検出",
+    "tray": "トレイにアイコンを表示",
+    "autoUpdate": "自動アップデート",
+    "save": "変更を保存"
   }
 }

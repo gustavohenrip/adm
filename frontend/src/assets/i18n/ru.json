@@ -1,7 +1,5 @@
 {
-  "app": {
-    "name": "Azrael"
-  },
+  "app": { "name": "Azrael" },
   "nav": {
     "all": "Все",
     "active": "Активные",
@@ -21,9 +19,7 @@
     "more": "Ещё",
     "settings": "Настройки"
   },
-  "sidebar": {
-    "sessionSpeed": "Скорость сессии"
-  },
+  "sidebar": { "sessionSpeed": "Скорость сессии" },
   "queue": {
     "columns": {
       "name": "Имя",
@@ -44,5 +40,22 @@
     "queued": "в очереди",
     "complete": "готово",
     "failed": "ошибка"
+  },
+  "settings": {
+    "title": "Настройки",
+    "appearance": "Внешний вид",
+    "theme": "Тема",
+    "language": "Язык",
+    "downloads": "Загрузки",
+    "downloadRoot": "Папка загрузок",
+    "defaultSegments": "Сегменты по умолчанию",
+    "rateLimit": "Глобальное ограничение скорости",
+    "network": "Сеть",
+    "proxy": "Прокси",
+    "system": "Система",
+    "clipboard": "Ловить URL из буфера обмена",
+    "tray": "Показывать значок в трее",
+    "autoUpdate": "Автоматические обновления",
+    "save": "Сохранить изменения"
   }
 }
