@@ -234,7 +234,7 @@ export class SettingsComponent implements OnInit {
   readonly saveState = signal('');
 
   state: SettingsState = {
-    downloadRoot: '~/Downloads/ADM',
+    downloadRoot: '~/Downloads/ODM',
     defaultSegments: 8,
     maxSegments: 16,
     rateLimitKbps: 0,

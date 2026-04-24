@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   release:
@@ -25,7 +26,10 @@ jobs:
           node-version: '20'
       - name: Build backend jar
         working-directory: backend
-        run: ./gradlew --no-daemon bootJar -x test
+        shell: bash
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew --no-daemon bootJar -x test
       - name: Build frontend
         working-directory: frontend
         run: |
@@ -34,16 +38,16 @@ jobs:
       - name: Stage artifacts
         shell: bash
         run: |
-          mkdir -p resources/backend electron/app
-          cp backend/build/libs/*.jar resources/backend/adm-backend.jar
-          cp -R frontend/dist/frontend/browser/* electron/app/
+          mkdir -p resources/backend odm-desktop/app
+          cp backend/build/libs/*.jar resources/backend/odm-backend.jar
+          cp -R frontend/dist/frontend/browser/* odm-desktop/app/
       - name: Install Linux packaging dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm
       - name: Publish installer
-        working-directory: electron
+        working-directory: odm-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash

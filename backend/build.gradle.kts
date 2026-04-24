@@ -4,8 +4,8 @@ plugins {
     id("io.spring.dependency-management") version "1.1.6"
 }
 
-group = "com.azrael"
-version = "0.1.0"
+group = "com.opendownloader"
+version = "1.0.0"
 
 java {
     toolchain {
@@ -40,5 +40,5 @@ tasks.test {
 }
 
 springBoot {
-    mainClass.set("com.azrael.adm.AdmApplication")
+    mainClass.set("com.opendownloader.odm.OdmApplication")
 }

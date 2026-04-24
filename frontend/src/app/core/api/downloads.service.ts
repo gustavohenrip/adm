@@ -40,6 +40,6 @@ export class DownloadsService {
 
   private get headers(): HttpHeaders {
     const token = this.config.snapshot().token;
-    return new HttpHeaders(token ? { 'X-Adm-Token': token } : {});
+    return new HttpHeaders(token ? { 'X-Odm-Token': token } : {});
   }
 }

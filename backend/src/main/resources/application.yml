@@ -5,7 +5,7 @@ server:
 
 spring:
   application:
-    name: adm-backend
+    name: odm-backend
   jpa:
     open-in-view: false
     hibernate:
@@ -15,14 +15,14 @@ spring:
         dialect: org.hibernate.community.dialect.SQLiteDialect
         show_sql: false
   datasource:
-    url: jdbc:sqlite:${user.home}/.adm/adm.sqlite
+    url: jdbc:sqlite:${user.home}/.odm/odm.sqlite
     driver-class-name: org.sqlite.JDBC
   quartz:
     job-store-type: memory
 
-adm:
+odm:
   downloads:
-    root: ${user.home}/Downloads/ADM
+    root: ${user.home}/Downloads/ODM
     default-segments: 8
     max-segments: 32
     retry:
@@ -36,7 +36,7 @@ adm:
     upnp-enabled: true
     listen-port: 0
   security:
-    token-header: X-Adm-Token
+    token-header: X-Odm-Token
   categorizer:
     enabled: true
     folders:
@@ -49,6 +49,6 @@ adm:
 logging:
   level:
     root: INFO
-    com.azrael.adm: DEBUG
+    com.opendownloader.odm: DEBUG
   pattern:
     console: "%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"

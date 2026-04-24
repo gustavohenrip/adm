@@ -1,4 +1,4 @@
-# Azrael Download Manager (ADM)
+# ODM — Open Downloader Manager
 
 A modern, cross-platform download manager combining the strengths of IDM (dynamic HTTP segmentation) and FDM (full BitTorrent support), wrapped in a clean liquid-glass UI.
 
@@ -22,7 +22,7 @@ A modern, cross-platform download manager combining the strengths of IDM (dynami
 
 ## Platforms
 
-- macOS (Intel + Apple Silicon)
+- macOS (Apple Silicon)
 - Windows (x86_64)
 - Linux (x86_64) — AppImage, deb, rpm
 
@@ -36,10 +36,10 @@ cd backend && ./gradlew bootRun
 cd frontend && npm install && npm start
 
 # electron shell (points to http://localhost:4200)
-cd electron && npm install && npm run dev
+cd odm-desktop && npm install && npm run dev
 ```
 
-The backend prints an `ADM_READY port=... token=...` line on stdout once listening. Electron parses that line in production; in dev you can pass the port and token through `ADM_BACKEND_PORT` and `ADM_BACKEND_TOKEN`.
+The backend prints an `ODM_READY port=... token=...` line on stdout once listening. Electron parses that line in production; in dev you can pass the port and token through `ODM_BACKEND_PORT` and `ODM_BACKEND_TOKEN`.
 
 ## Release
 

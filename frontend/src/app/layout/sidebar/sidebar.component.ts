@@ -26,7 +26,7 @@ export interface SidebarNavItem {
           <div class="brand-mark" aria-hidden="true">
             <app-icon name="arrow-down" [size]="11"></app-icon>
           </div>
-          <span class="brand-name">Azrael</span>
+          <span class="brand-name">ODM</span>
         </div>
 
         <button class="new-btn" type="button" (click)="newDownload.emit()">

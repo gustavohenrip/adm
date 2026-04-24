@@ -11,10 +11,10 @@ export class BackendConfigService {
   readonly config = this._config.asReadonly();
 
   async load(): Promise<void> {
-    const adm = (globalThis as unknown as { adm?: { getBackendInfo(): Promise<{ port: number; token: string }> } }).adm;
-    if (adm?.getBackendInfo) {
+    const odm = (globalThis as unknown as { odm?: { getBackendInfo(): Promise<{ port: number; token: string }> } }).odm;
+    if (odm?.getBackendInfo) {
       try {
-        const info = await adm.getBackendInfo();
+        const info = await odm.getBackendInfo();
         if (info?.port) {
           this._config.set({ baseUrl: `http://127.0.0.1:${info.port}`, token: info.token ?? '' });
         }

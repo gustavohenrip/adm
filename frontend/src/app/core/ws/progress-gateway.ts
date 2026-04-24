@@ -19,7 +19,7 @@ export class ProgressGateway {
     const SockJS = (await import('sockjs-client')).default;
     this.client = new Client({
       webSocketFactory: () => new SockJS(`${baseUrl}/ws`) as any,
-      connectHeaders: token ? { 'X-Adm-Token': token } : {},
+      connectHeaders: token ? { 'X-Odm-Token': token } : {},
       reconnectDelay: 2000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,

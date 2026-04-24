@@ -10,6 +10,6 @@
         <appender-ref ref="CONSOLE"/>
     </root>
 
-    <logger name="com.azrael.adm" level="DEBUG"/>
+    <logger name="com.opendownloader.odm" level="DEBUG"/>
     <logger name="org.hibernate.SQL" level="WARN"/>
 </configuration>

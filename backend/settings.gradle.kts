@@ -1,1 +1,1 @@
-rootProject.name = "adm-backend"
+rootProject.name = "odm-backend"

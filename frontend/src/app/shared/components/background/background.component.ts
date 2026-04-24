@@ -10,10 +10,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       <div class="wash wash-2"></div>
       <div class="wash wash-3"></div>
       <svg class="grain" width="100%" height="100%">
-        <filter id="adm-grain">
+        <filter id="odm-grain">
           <feTurbulence baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
         </filter>
-        <rect width="100%" height="100%" filter="url(#adm-grain)"/>
+        <rect width="100%" height="100%" filter="url(#odm-grain)"/>
       </svg>
     </div>
   `,

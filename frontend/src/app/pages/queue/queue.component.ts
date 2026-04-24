@@ -238,8 +238,8 @@ export class QueueComponent implements OnInit {
 
   onOpenFolder(id: string): void {
     const download = this.downloads().find((d) => d.id === id);
-    const adm = (globalThis as unknown as { adm?: { openFolder?: (path: string) => Promise<void> } }).adm;
-    if (download?.folder && adm?.openFolder) adm.openFolder(download.folder);
+    const odm = (globalThis as unknown as { odm?: { openFolder?: (path: string) => Promise<void> } }).odm;
+    if (download?.folder && odm?.openFolder) odm.openFolder(download.folder);
   }
 
   onRemove(id: string): void {
