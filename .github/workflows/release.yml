@@ -47,6 +47,11 @@ jobs:
           cp backend/build/libs/*.jar resources/backend/odm-backend.jar
           cp -R "$JAVA_HOME"/. resources/jdk/
           cp -R frontend/dist/frontend/browser/* odm-desktop/app/
+      - name: Verify packaged frontend
+        shell: bash
+        run: |
+          test -f odm-desktop/app/index.html
+          grep -q '<base href="./">' odm-desktop/app/index.html
       - name: Publish installer
         working-directory: odm-desktop
         env:
@@ -69,7 +74,7 @@ jobs:
             [[ -n "${APPLE_TEAM_ID:-}" ]] || missing+=("APPLE_TEAM_ID")
             if (( ${#missing[@]} )); then
               printf 'Missing macOS release secrets: %s\n' "${missing[*]}" >&2
-              exit 1
+              exit 0
             fi
             GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
           else

@@ -69,6 +69,11 @@ jobs:
           cp backend/build/libs/*.jar resources/backend/odm-backend.jar
           cp -R "$JAVA_HOME"/. resources/jdk/
           cp -R frontend/dist/frontend/browser/* odm-desktop/app/
+      - name: Verify packaged frontend
+        shell: bash
+        run: |
+          test -f odm-desktop/app/index.html
+          grep -q '<base href="./">' odm-desktop/app/index.html
       - name: Electron package
         working-directory: odm-desktop
         shell: bash
