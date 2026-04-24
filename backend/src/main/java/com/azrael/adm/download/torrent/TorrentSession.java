@@ -7,6 +7,8 @@ import java.util.Base64;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -33,6 +35,7 @@ import com.frostwire.jlibtorrent.swig.session_handle;
 public class TorrentSession {
 
     private static final Logger log = LoggerFactory.getLogger(TorrentSession.class);
+    private static final Pattern BTIH = Pattern.compile("xt=urn:btih:([^&]+)", Pattern.CASE_INSENSITIVE);
 
     private final TorrentProperties props;
     private SessionManager manager;
@@ -81,7 +84,8 @@ public class TorrentSession {
     public String addMagnet(String magnet, Path savePath) {
         Objects.requireNonNull(manager, "torrent session unavailable");
         manager.download(magnet, savePath.toFile(), TorrentFlags.AUTO_MANAGED);
-        return magnet;
+        String key = magnetKey(magnet);
+        return key == null ? magnet : key;
     }
 
     public String addTorrentFile(byte[] torrentBytes, Path savePath) throws Exception {
@@ -123,9 +127,37 @@ public class TorrentSession {
     private TorrentHandle findHandle(String infoHash) {
         if (manager == null) return null;
         for (TorrentHandle h : manager.getTorrentHandles()) {
-            if (h.infoHash().toHex().equalsIgnoreCase(infoHash)) return h;
+            if (matches(h, infoHash)) return h;
         }
         return null;
+    }
+
+    public TorrentHandle handle(String key) {
+        return findHandle(key);
+    }
+
+    public static String magnetKey(String magnet) {
+        if (magnet == null) return null;
+        Matcher matcher = BTIH.matcher(magnet);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private boolean matches(TorrentHandle h, String key) {
+        if (key == null || key.isBlank()) return false;
+        String normalized = key.trim();
+        try {
+            if (h.infoHash().toHex().equalsIgnoreCase(normalized)) return true;
+        } catch (Exception ignored) {
+        }
+        try {
+            if (h.status().infoHashV1().toHex().equalsIgnoreCase(normalized)) return true;
+        } catch (Exception ignored) {
+        }
+        try {
+            return h.makeMagnetUri().toLowerCase().contains(normalized.toLowerCase());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void handleAlert(Alert<?> alert) {

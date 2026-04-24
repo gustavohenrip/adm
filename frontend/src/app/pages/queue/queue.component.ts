@@ -19,7 +19,7 @@ import { ProgressGateway } from '../../core/ws/progress-gateway';
       <div class="panel">
         <form class="create" (ngSubmit)="addUrl()">
           <input
-            type="url"
+            type="text"
             name="url"
             [(ngModel)]="url"
             placeholder="https://example.com/file.zip"
@@ -175,7 +175,10 @@ export class QueueComponent implements OnInit {
     const url = this.url.trim();
     if (!url) return;
     this.busy.set(true);
-    this.downloadsService.create({ url }).subscribe({
+    const request = url.toLowerCase().startsWith('magnet:')
+      ? this.downloadsService.addTorrent({ magnet: url })
+      : this.downloadsService.create({ url });
+    request.subscribe({
       next: (download) => {
         this.url = '';
         this.mergeOne(download);
