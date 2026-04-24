@@ -63,6 +63,11 @@ jobs:
           mkdir -p resources/backend electron/app
           cp backend/build/libs/*.jar resources/backend/adm-backend.jar
           cp -R frontend/dist/frontend/browser/* electron/app/
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
       - name: Electron package
         working-directory: electron
         shell: bash

@@ -2,6 +2,11 @@
   "name": "adm-electron",
   "version": "0.1.0",
   "description": "Azrael Download Manager — desktop shell",
+  "homepage": "https://github.com/gustavohenrip/adm",
+  "author": {
+    "name": "Gustavo Henrique Puhlmann",
+    "email": "gustavo.puhlmann15@gmail.com"
+  },
   "main": "src/main.cjs",
   "private": true,
   "scripts": {
@@ -85,7 +90,8 @@
           ]
         }
       ],
-      "category": "Network"
+      "category": "Network",
+      "maintainer": "gustavo.puhlmann15@gmail.com"
     }
   }
 }
