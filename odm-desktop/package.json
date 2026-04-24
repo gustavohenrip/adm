@@ -1,11 +1,7 @@
 {
   "name": "odm-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ODM — Open Downloader Manager desktop shell",
-  "author": {
-    "name": "ODM contributors",
-    "email": "noreply@github.com"
-  },
   "main": "src/main.cjs",
   "private": true,
   "scripts": {
@@ -96,8 +92,7 @@
           ]
         }
       ],
-      "category": "Network",
-      "maintainer": "noreply@github.com"
+      "category": "Network"
     }
   }
 }

@@ -50,7 +50,7 @@ jobs:
       - name: Publish installer
         working-directory: odm-desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ODM_RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -63,13 +63,14 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" && -z "${CSC_LINK:-}" ]]; then
             unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
             export CSC_IDENTITY_AUTO_DISCOVERY=false
-            npx electron-builder --publish never -c.mac.identity=-
+            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never -c.mac.identity=-
           else
-            npx electron-builder --publish never
+            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
           fi
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             codesign --verify --deep --strict --verbose=4 "dist/mac-arm64/ODM.app"
           fi
+          export GH_TOKEN="$ODM_RELEASE_TOKEN"
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes "ODM desktop release." --latest || true
           else
