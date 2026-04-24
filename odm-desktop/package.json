@@ -1,6 +1,6 @@
 {
   "name": "odm-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "ODM — Open Downloader Manager desktop shell",
   "main": "src/main.cjs",
   "private": true,
@@ -13,6 +13,7 @@
     "dist:linux": "electron-builder --linux"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "cross-env": "^7.0.3",
     "electron": "^32.3.3",
     "electron-builder": "^25.1.8"
@@ -29,6 +30,7 @@
       "buildResources": "build"
     },
     "afterPack": "scripts/after-pack.cjs",
+    "afterSign": "scripts/notarize.cjs",
     "files": [
       "src/**/*",
       "scripts/**/*",

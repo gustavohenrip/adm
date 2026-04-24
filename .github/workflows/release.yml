@@ -60,10 +60,18 @@ jobs:
         shell: bash
         run: |
           npm install --no-audit --no-fund
-          if [[ "$RUNNER_OS" == "macOS" && -z "${CSC_LINK:-}" ]]; then
-            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
-            export CSC_IDENTITY_AUTO_DISCOVERY=false
-            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never -c.mac.identity=-
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            missing=()
+            [[ -n "${CSC_LINK:-}" ]] || missing+=("MAC_CSC_LINK")
+            [[ -n "${CSC_KEY_PASSWORD:-}" ]] || missing+=("MAC_CSC_KEY_PASSWORD")
+            [[ -n "${APPLE_ID:-}" ]] || missing+=("APPLE_ID")
+            [[ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]] || missing+=("APPLE_APP_SPECIFIC_PASSWORD")
+            [[ -n "${APPLE_TEAM_ID:-}" ]] || missing+=("APPLE_TEAM_ID")
+            if (( ${#missing[@]} )); then
+              printf 'Missing macOS release secrets: %s\n' "${missing[*]}" >&2
+              exit 1
+            fi
+            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
           else
             GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
           fi
