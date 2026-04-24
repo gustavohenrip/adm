@@ -1,8 +1,4 @@
 .DS_Store
-.claude/
-CLAUDE.md
-MEMORY.md
-memory/
 *.log
 *.tmp
 *.swp
@@ -31,9 +27,6 @@ odm-desktop/app/
 
 resources/jdk/
 resources/backend/
-.playwright-mcp/
-odm-phase1-*.png
-adm-phase1-*.png
 
 *.sqlite
 *.sqlite-journal
