@@ -1,4 +1,5 @@
-const NATIVE_HOST = 'com.odm.bridge';
+const DISCOVERY_PORTS = [9614, 9615, 9616, 9617, 9618];
+const DISCOVERY_TTL_MS = 60_000;
 
 const DEFAULT_SETTINGS = {
   enabled: true,
@@ -15,13 +16,11 @@ const DEFAULT_SETTINGS = {
   showNotifications: true,
 };
 
+let discoveryCache = null;
+
 async function loadSettings() {
   const stored = await chrome.storage.sync.get('odmSettings');
   return { ...DEFAULT_SETTINGS, ...(stored.odmSettings || {}) };
-}
-
-async function saveSettings(values) {
-  await chrome.storage.sync.set({ odmSettings: { ...DEFAULT_SETTINGS, ...values } });
 }
 
 function extensionOf(url, filename) {
@@ -47,41 +46,49 @@ function shouldIntercept(item, settings) {
   if (item.mime && settings.excludeMime.includes(item.mime.toLowerCase())) return false;
   const ext = extensionOf(item.finalUrl || item.url, item.filename);
   const sizeKB = Math.max(0, (item.totalBytes || 0) / 1024);
-  if (sizeKB > 0 && sizeKB < settings.minSizeKB && !settings.extensions.includes(ext)) {
-    return false;
-  }
   if (settings.extensions.length > 0 && ext && settings.extensions.includes(ext)) return true;
   if (sizeKB >= settings.minSizeKB) return true;
-  return ext && settings.extensions.includes(ext);
+  return false;
 }
 
-function nativeRequest(payload) {
-  return new Promise((resolve, reject) => {
-    let port;
+async function discoverOnce() {
+  for (const port of DISCOVERY_PORTS) {
     try {
-      port = chrome.runtime.connectNative(NATIVE_HOST);
+      const res = await fetch(`http://127.0.0.1:${port}/odm-handshake`, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(1500),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && data.ok && data.port && data.token) {
+        return { ...data, discoveryPort: port, fetchedAt: Date.now() };
+      }
+      if (data && data.ok === false) {
+        return { ok: false, error: data.error || 'odm not ready', discoveryPort: port };
+      }
     } catch (e) {
-      reject(e);
-      return;
+      // try next port
     }
-    const cleanup = () => {
-      try { port.disconnect(); } catch {}
-    };
-    port.onMessage.addListener((response) => {
-      cleanup();
-      resolve(response);
-    });
-    port.onDisconnect.addListener(() => {
-      const err = chrome.runtime.lastError;
-      if (err) reject(new Error(err.message));
-    });
-    try {
-      port.postMessage(payload);
-    } catch (e) {
-      cleanup();
-      reject(e);
-    }
-  });
+  }
+  return null;
+}
+
+async function getHandshake({ force = false } = {}) {
+  if (!force && discoveryCache && discoveryCache.ok && Date.now() - discoveryCache.fetchedAt < DISCOVERY_TTL_MS) {
+    return discoveryCache;
+  }
+  const fresh = await discoverOnce();
+  if (fresh && fresh.ok) {
+    discoveryCache = fresh;
+    return fresh;
+  }
+  if (fresh && fresh.ok === false) {
+    discoveryCache = null;
+    return fresh;
+  }
+  discoveryCache = null;
+  return { ok: false, error: 'ODM is not running' };
 }
 
 async function getCookieHeader(url) {
@@ -107,22 +114,43 @@ async function notify(title, message) {
   } catch {}
 }
 
+async function postToBackend(handshake, body) {
+  const url = `${handshake.baseUrl}/api/downloads`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Odm-Token': handshake.token,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
 async function sendToOdm(url, options = {}) {
-  const referer = options.referer || '';
+  const handshake = await getHandshake();
+  if (!handshake.ok) {
+    return { ok: false, error: handshake.error || 'discovery failed' };
+  }
   const cookieHeader = options.cookieHeader || (await getCookieHeader(url));
-  const payload = {
-    action: 'enqueue',
-    payload: {
-      url,
-      folder: undefined,
-    },
-    meta: {
-      referer,
-      cookies: cookieHeader,
-      userAgent: navigator.userAgent,
-    },
+  const body = {
+    url,
+    folder: options.folder,
+    referer: options.referer || '',
+    cookies: cookieHeader,
+    userAgent: options.userAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : ''),
   };
-  return nativeRequest(payload);
+  try {
+    const result = await postToBackend(handshake, body);
+    return { ok: true, result };
+  } catch (e) {
+    discoveryCache = null;
+    return { ok: false, error: String(e && e.message || e) };
+  }
 }
 
 chrome.downloads.onCreated.addListener(async (item) => {
@@ -131,20 +159,21 @@ chrome.downloads.onCreated.addListener(async (item) => {
     if (!shouldIntercept(item, settings)) return;
     const url = item.finalUrl || item.url;
     if (!url) return;
-    let referer = '';
-    try {
-      const tab = item.referrer ? null : await chrome.tabs.query({ active: true, currentWindow: true });
-      referer = item.referrer || (tab && tab[0] && tab[0].url) || '';
-    } catch {}
+    let referer = item.referrer || '';
+    if (!referer) {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        referer = (tabs && tabs[0] && tabs[0].url) || '';
+      } catch {}
+    }
     const cookieHeader = await getCookieHeader(url);
     const result = await sendToOdm(url, { referer, cookieHeader });
-    if (result && result.ok !== false) {
+    if (result.ok) {
       try { await chrome.downloads.cancel(item.id); } catch {}
       try { await chrome.downloads.erase({ id: item.id }); } catch {}
       await notify('Sent to ODM', url);
     } else {
-      const reason = (result && result.error) || 'unknown error';
-      await notify('ODM bridge unreachable', reason);
+      await notify('ODM bridge unreachable', result.error || 'unknown error');
     }
   } catch (e) {
     await notify('ODM bridge error', String(e && e.message || e));
@@ -173,10 +202,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const cookieHeader = await getCookieHeader(url);
     const referer = (tab && tab.url) || '';
     const result = await sendToOdm(url, { referer, cookieHeader });
-    if (result && result.ok !== false) {
+    if (result.ok) {
       await notify('Sent to ODM', url);
     } else {
-      await notify('ODM error', (result && result.error) || 'unknown');
+      await notify('ODM error', result.error || 'unknown');
     }
   } catch (e) {
     await notify('ODM bridge error', String(e && e.message || e));
@@ -185,7 +214,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'odm/handshake') {
-    nativeRequest({ action: 'handshake' })
+    getHandshake({ force: true })
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, error: String(e && e.message || e) }));
     return true;

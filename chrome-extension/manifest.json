@@ -28,15 +28,15 @@
   "options_page": "options.html",
   "permissions": [
     "downloads",
-    "nativeMessaging",
     "storage",
     "contextMenus",
     "cookies",
     "notifications",
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ]
 }
