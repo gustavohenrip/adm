@@ -53,7 +53,12 @@ public class TorrentDownloadService {
     private final RuntimeSettings settings;
     private final UrlGuard urlGuard;
     private final PersistenceGate persistenceGate;
-    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor();
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TorrentDownloadService.class);
+    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "odm-torrent-monitor");
+        t.setDaemon(true);
+        return t;
+    });
 
     public TorrentDownloadService(TorrentSession torrents, DownloadRepository repo, ProgressBus progressBus,
                                   RuntimeSettings settings, UrlGuard urlGuard, PersistenceGate persistenceGate) {
@@ -67,7 +72,15 @@ public class TorrentDownloadService {
 
     @PostConstruct
     public void start() {
-        monitor.scheduleAtFixedRate(this::refresh, 1000, 1000, TimeUnit.MILLISECONDS);
+        monitor.scheduleWithFixedDelay(this::tick, 1000, 1000, TimeUnit.MILLISECONDS);
+    }
+
+    private void tick() {
+        try {
+            refresh();
+        } catch (Throwable t) {
+            log.warn("torrent refresh failed", t);
+        }
     }
 
     @PreDestroy

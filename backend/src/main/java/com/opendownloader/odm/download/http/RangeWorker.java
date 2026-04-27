@@ -114,7 +114,32 @@ public final class RangeWorker implements Runnable {
 
     private void processSegment(Segment seg) throws Exception {
         if (stopFlag.get()) return;
-        processSegmentInternal(seg);
+        int attempt = 0;
+        long backoffMs = 500L;
+        while (true) {
+            try {
+                processSegmentInternal(seg);
+                return;
+            } catch (RangeNotSupportedException fatal) {
+                throw fatal;
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw ie;
+            } catch (Exception e) {
+                if (stopFlag.get()) return;
+                attempt++;
+                if (attempt >= 6) throw e;
+                long sleep = Math.min(8000L, backoffMs);
+                backoffMs *= 2;
+                log.warn("range worker retry {} for segment {}-{}: {}", attempt, seg.cursor(), seg.end(), e.toString());
+                try {
+                    Thread.sleep(sleep);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw ie;
+                }
+            }
+        }
     }
 
     private void processSegmentInternal(Segment seg) throws Exception {

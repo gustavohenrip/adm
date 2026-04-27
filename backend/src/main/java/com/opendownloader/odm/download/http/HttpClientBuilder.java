@@ -2,7 +2,6 @@ package com.opendownloader.odm.download.http;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.concurrent.Executors;
 
 public final class HttpClientBuilder {
 
@@ -12,8 +11,7 @@ public final class HttpClientBuilder {
         HttpClient.Builder b = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(30))
-                .version(HttpClient.Version.HTTP_2)
-                .executor(Executors.newCachedThreadPool());
+                .version(HttpClient.Version.HTTP_1_1);
 
         if (proxy != null && proxy.kind() != ProxySettings.Kind.NONE) {
             b.proxy(proxy.toSelector());

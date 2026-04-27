@@ -41,7 +41,14 @@ public class StompProgressBroadcaster {
     @PostConstruct
     public void start() {
         progressBus.setSink(this::enqueue);
-        executor.scheduleAtFixedRate(this::flush, INTERVAL_MS, INTERVAL_MS, TimeUnit.MILLISECONDS);
+        executor.scheduleWithFixedDelay(this::tick, INTERVAL_MS, INTERVAL_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private void tick() {
+        try {
+            flush();
+        } catch (Throwable ignored) {
+        }
     }
 
     @PreDestroy

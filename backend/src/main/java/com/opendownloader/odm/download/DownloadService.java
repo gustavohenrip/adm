@@ -60,10 +60,21 @@ public class DownloadService {
     private final ScheduleRuleRepository scheduleRules;
     private final SystemEventsBroadcaster systemEvents;
     private final PersistenceGate persistenceGate;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
-    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor();
+    private static final long STALL_TIMEOUT_NANOS = 45_000_000_000L;
+    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "odm-download-runner");
+        t.setDaemon(true);
+        return t;
+    });
+    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "odm-download-monitor");
+        t.setDaemon(true);
+        return t;
+    });
     private final Map<String, DownloadRunner> active = new ConcurrentHashMap<>();
-    private final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
+    private final Map<String, FutureHolder> runningTasks = new ConcurrentHashMap<>();
+    private final Map<String, ProgressMark> progressMarks = new ConcurrentHashMap<>();
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DownloadService.class);
 
     public DownloadService(DownloadRepository repo, FileCategorizer categorizer, UrlGuard urlGuard,
                            ProgressBus progressBus, DownloadProperties props, CredentialVault vault,
@@ -101,7 +112,20 @@ public class DownloadService {
             d.setStatus(DownloadStatus.PAUSED);
             save(d);
         });
-        monitor.scheduleAtFixedRate(this::flushProgress, 250, 500, TimeUnit.MILLISECONDS);
+        monitor.scheduleWithFixedDelay(this::tick, 250, 500, TimeUnit.MILLISECONDS);
+    }
+
+    private void tick() {
+        try {
+            flushProgress();
+        } catch (Throwable t) {
+            log.warn("flush progress failed", t);
+        }
+        try {
+            checkStalled();
+        } catch (Throwable t) {
+            log.warn("stall check failed", t);
+        }
     }
 
     @PreDestroy
@@ -298,11 +322,12 @@ public class DownloadService {
                     requestHeaders);
         }
         active.put(e.getId(), job);
-        Future<?> task = executor.submit(() -> runJob(e.getId(), job));
-        runningTasks.put(e.getId(), task);
+        FutureHolder holder = new FutureHolder();
+        runningTasks.put(e.getId(), holder);
+        holder.future = executor.submit(() -> runJob(e.getId(), job, holder));
     }
 
-    private void runJob(String id, DownloadRunner job) {
+    private void runJob(String id, DownloadRunner job, FutureHolder holder) {
         try {
             markStatus(id, DownloadStatus.DOWNLOADING, null);
             RetryPolicy retry = new RetryPolicy(props.getRetry().getMaxAttempts(),
@@ -328,15 +353,25 @@ public class DownloadService {
             }
             if (active.remove(id, job)) markStatus(id, DownloadStatus.FAILED, e.getMessage());
         } finally {
-            runningTasks.remove(id);
+            runningTasks.remove(id, holder);
+            progressMarks.remove(id);
+        }
+    }
+
+    private static final class FutureHolder {
+        volatile Future<?> future;
+        void cancel() {
+            Future<?> f = future;
+            if (f != null) f.cancel(true);
         }
     }
 
     private void stopActive(String id) {
         DownloadRunner job = active.remove(id);
         if (job != null) job.stop();
-        Future<?> task = runningTasks.remove(id);
-        if (task != null) task.cancel(true);
+        FutureHolder holder = runningTasks.remove(id);
+        if (holder != null) holder.cancel();
+        progressMarks.remove(id);
     }
 
     private boolean isRangeNotSupported(Throwable error) {
@@ -368,17 +403,52 @@ public class DownloadService {
     }
 
     private void flushProgress() {
-        try {
-            for (String id : active.keySet()) {
+        for (String id : active.keySet()) {
+            try {
                 repo.findById(id).ifPresent(e -> {
-                    e.setDownloadedBytes(Math.max(e.getDownloadedBytes(), progressBus.downloaded(id)));
+                    long downloaded = Math.max(e.getDownloadedBytes(), progressBus.downloaded(id));
+                    e.setDownloadedBytes(downloaded);
                     DownloadEntity saved = saveIfPresent(e);
                     if (saved != null) publish(saved);
                 });
+            } catch (Throwable t) {
+                log.warn("progress flush failed for {}", id, t);
             }
-        } catch (Exception ignored) {
         }
     }
+
+    private void checkStalled() {
+        long now = System.nanoTime();
+        for (Map.Entry<String, DownloadRunner> entry : active.entrySet()) {
+            String id = entry.getKey();
+            DownloadRunner runner = entry.getValue();
+            long bytes = progressBus.downloaded(id);
+            ProgressMark mark = progressMarks.get(id);
+            if (mark == null || mark.bytes != bytes) {
+                progressMarks.put(id, new ProgressMark(bytes, now));
+                continue;
+            }
+            if (now - mark.timestamp < STALL_TIMEOUT_NANOS) continue;
+            log.warn("download {} stalled at {} bytes; restarting workers", id, bytes);
+            progressMarks.remove(id);
+            if (active.remove(id, runner)) {
+                runner.stop();
+                FutureHolder holder = runningTasks.remove(id);
+                if (holder != null) holder.cancel();
+                executor.submit(() -> {
+                    try {
+                        DownloadEntity e = find(id);
+                        startJob(e);
+                    } catch (Throwable t) {
+                        markStatus(id, DownloadStatus.FAILED, "stalled and restart failed: " + t.getMessage());
+                    }
+                });
+            }
+        }
+        progressMarks.keySet().retainAll(active.keySet());
+    }
+
+    private record ProgressMark(long bytes, long timestamp) { }
 
     private void markStatus(String id, DownloadStatus status, String error) {
         repo.findById(id).ifPresent(e -> {
