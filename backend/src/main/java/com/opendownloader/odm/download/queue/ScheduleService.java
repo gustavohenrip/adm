@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
+import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobKey;
@@ -19,8 +20,11 @@ import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import com.opendownloader.odm.download.DownloadService;
 import com.opendownloader.odm.persistence.ScheduleRuleEntity;
 import com.opendownloader.odm.persistence.ScheduleRuleRepository;
 
@@ -45,12 +49,26 @@ public class ScheduleService {
         }
     }
 
+    public List<ScheduleRuleEntity> rules() { return repo.findAll(); }
+
+    public ScheduleRuleEntity save(ScheduleRuleEntity rule) throws SchedulerException {
+        ScheduleRuleEntity saved = repo.save(rule);
+        unregister(saved.getId());
+        if (saved.isEnabled()) register(saved);
+        return saved;
+    }
+
+    public void delete(Long id) throws SchedulerException {
+        unregister(id);
+        repo.deleteById(id);
+    }
+
     public void register(ScheduleRuleEntity rule) throws SchedulerException {
         if (rule.getCronStart() != null && !rule.getCronStart().isBlank()) {
-            schedule(rule.getId(), "start", rule.getCronStart(), StartAllJob.class);
+            schedule(rule.getId(), "start", rule.getCronStart(), StartAllJob.class, rule);
         }
         if (rule.getCronPause() != null && !rule.getCronPause().isBlank()) {
-            schedule(rule.getId(), "pause", rule.getCronPause(), PauseAllJob.class);
+            schedule(rule.getId(), "pause", rule.getCronPause(), PauseAllJob.class, rule);
         }
     }
 
@@ -59,11 +77,19 @@ public class ScheduleService {
         scheduler.deleteJob(JobKey.jobKey("pause-" + ruleId, GROUP));
     }
 
-    private void schedule(Long ruleId, String kind, String cron, Class<? extends Job> jobClass) throws SchedulerException {
+    private void schedule(Long ruleId, String kind, String cron, Class<? extends Job> jobClass, ScheduleRuleEntity rule) throws SchedulerException {
         JobKey jobKey = JobKey.jobKey(kind + "-" + ruleId, GROUP);
         TriggerKey triggerKey = TriggerKey.triggerKey(kind + "-" + ruleId, GROUP);
         scheduler.deleteJob(jobKey);
-        JobDetail job = JobBuilder.newJob(jobClass).withIdentity(jobKey).storeDurably().build();
+        JobDataMap data = new JobDataMap();
+        data.put("ruleId", ruleId);
+        data.put("shutdownAfter", rule.isShutdownAfter());
+        if (rule.getRateLimitKbps() != null) data.put("rateLimitKbps", rule.getRateLimitKbps());
+        JobDetail job = JobBuilder.newJob(jobClass)
+                .withIdentity(jobKey)
+                .usingJobData(data)
+                .storeDurably()
+                .build();
         Trigger trigger = TriggerBuilder.newTrigger()
                 .withIdentity(triggerKey)
                 .forJob(job)
@@ -73,16 +99,28 @@ public class ScheduleService {
     }
 
     public static class StartAllJob implements Job {
+        @Autowired ApplicationContext context;
         @Override
-        public void execute(JobExecutionContext context) {
-            LoggerFactory.getLogger(StartAllJob.class).info("scheduled: resume queue");
+        public void execute(JobExecutionContext jobContext) {
+            DownloadService downloads = context.getBean(DownloadService.class);
+            RateLimiter limiter = context.getBean(RateLimiter.class);
+            JobDataMap data = jobContext.getMergedJobDataMap();
+            if (data.containsKey("rateLimitKbps")) {
+                long kbps = data.getLong("rateLimitKbps");
+                limiter.setLimit(kbps * 1024L);
+            }
+            downloads.resumeAll();
+            log.info("scheduled: resumed queue");
         }
     }
 
     public static class PauseAllJob implements Job {
+        @Autowired ApplicationContext context;
         @Override
-        public void execute(JobExecutionContext context) {
-            LoggerFactory.getLogger(PauseAllJob.class).info("scheduled: pause queue");
+        public void execute(JobExecutionContext jobContext) {
+            DownloadService downloads = context.getBean(DownloadService.class);
+            downloads.pauseAll();
+            log.info("scheduled: paused queue");
         }
     }
 
