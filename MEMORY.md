@@ -15,3 +15,8 @@
 - 2026-04-27: Em downloads longos, `stop()` nao pode apenas setar flag; precisa interromper thread e fechar stream/conexao ativa para delete/pause nao ficarem travados.
 - 2026-04-27: Se `package.json` ja foi alterado manualmente, nao rodar `npm version` para sincronizar lockfile; usar `npm install --package-lock-only`.
 - 2026-04-27: Monitores periodicos nao podem salvar entidades carregadas antes de um delete; isso pode recriar download removido. Salvar progresso somente se o registro ainda existir sob o mesmo lock.
+- 2026-04-27: HttpClient com HTTP/2 + custom cachedThreadPool por download trava streams quando ha varios downloads simultaneos. Usar HTTP/1.1 e executor padrao para evitar stalls.
+- 2026-04-27: scheduleAtFixedRate silencia se a tarefa lanca Throwable nao tratado e para de agendar para sempre. Sempre usar scheduleWithFixedDelay e wrap em try/catch Throwable.
+- 2026-04-27: Em concurrency com mapa de Future por download, o finally do runJob pode remover entrada de um job mais novo. Usar holder com compare-and-remove (ConcurrentHashMap.remove(K,V)) para evitar race.
+- 2026-04-27: Detector de stall por amostra de progressBus.downloaded e watchdog que reinicia worker quando bytes nao avancam por X segundos resolve travas de stream.
+- 2026-04-27: Workflow Release as vezes falha por 502 transitorio do CDN do Gradle; basta rerun do job que o build sai limpo.
