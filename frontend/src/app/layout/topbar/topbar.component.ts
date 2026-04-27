@@ -27,6 +27,15 @@ import { ThemeService } from '../../core/theme/theme.service';
           <span class="kbd">⌘V</span>
         </div>
 
+        <div class="bulk-seg" role="group" [attr.aria-label]="'actions.bulk' | translate">
+          <button type="button" class="seg" (click)="resumeAll.emit()" [attr.aria-label]="'actions.resumeAll' | translate" [title]="'actions.resumeAll' | translate">
+            <app-icon name="play" [size]="13"></app-icon>
+          </button>
+          <button type="button" class="seg" (click)="pauseAll.emit()" [attr.aria-label]="'actions.pauseAll' | translate" [title]="'actions.pauseAll' | translate">
+            <app-icon name="pause" [size]="13"></app-icon>
+          </button>
+        </div>
+
         <div class="theme-seg" role="group" aria-label="Theme">
           <button type="button" class="seg" [class.active]="theme() === 'light'" (click)="setTheme('light')" aria-label="Light theme">
             <app-icon name="sun" [size]="13"></app-icon>
@@ -73,7 +82,7 @@ import { ThemeService } from '../../core/theme/theme.service';
       background: var(--chip);
       border: 1px solid var(--chip-border);
       border-radius: 11px;
-      min-width: 420px;
+      min-width: 360px;
       color: var(--text-dim);
       font-size: 12.5px;
       cursor: pointer;
@@ -88,7 +97,7 @@ import { ThemeService } from '../../core/theme/theme.service';
       letter-spacing: 0.2px;
     }
 
-    .theme-seg {
+    .bulk-seg, .theme-seg {
       display: flex;
       align-items: center;
       background: var(--chip);
@@ -113,7 +122,7 @@ import { ThemeService } from '../../core/theme/theme.service';
       border-color: var(--glass-border-2);
       color: var(--text);
     }
-    .seg:hover:not(.active) { color: var(--text); }
+    .seg:hover:not(.active) { color: var(--text); background: var(--glass-hi); }
 
     .settings-btn {
       all: unset;
@@ -161,6 +170,8 @@ export class TopbarComponent {
 
   @Output() pasteUrl = new EventEmitter<void>();
   @Output() openSettings = new EventEmitter<void>();
+  @Output() pauseAll = new EventEmitter<void>();
+  @Output() resumeAll = new EventEmitter<void>();
 
   setTheme(value: 'light' | 'dark') {
     this.themeService.set(value);
