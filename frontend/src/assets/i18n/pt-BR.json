@@ -18,10 +18,15 @@
     "remove": "Remover",
     "openFolder": "Abrir pasta",
     "more": "Mais",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "pauseAll": "Pausar todos",
+    "resumeAll": "Retomar todos",
+    "bulk": "Ações em massa",
+    "refresh": "Religar link"
   },
   "sidebar": { "sessionSpeed": "Velocidade da sessão" },
   "queue": {
+    "advanced": "Avançado",
     "columns": {
       "name": "Nome",
       "size": "Tamanho",
@@ -35,6 +40,45 @@
       "items": "{{count}} itens · {{total}}",
       "updated": "Atualizado agora"
     }
+  },
+  "addDialog": {
+    "title": "Adicionar download",
+    "single": "Único",
+    "batch": "Lote",
+    "mirrors": "Espelhos (um por linha, opcional)",
+    "mirrorsHint": "https://espelho1/arquivo.zip\nhttps://espelho2/arquivo.zip",
+    "segments": "Segmentos",
+    "checksumAlgo": "Checksum",
+    "checksumExpected": "Hash esperado",
+    "folder": "Pasta",
+    "folderHint": "Deixe em branco pra pasta padrão",
+    "auth": "Autenticação HTTP",
+    "username": "Usuário",
+    "password": "Senha",
+    "batchUrls": "Lista de URLs",
+    "batchUrlsHint": "Uma URL por linha",
+    "pattern": "Padrão (use [001-100])",
+    "submit": "Iniciar",
+    "cancel": "Cancelar"
+  },
+  "clipboard": {
+    "detected": "URL detectada",
+    "download": "Baixar",
+    "dismiss": "Dispensar"
+  },
+  "schedule": {
+    "title": "Agenda",
+    "add": "Nova regra",
+    "loading": "Carregando regras…",
+    "empty": "Nenhuma regra. Crie uma pra iniciar ou pausar a fila automaticamente.",
+    "label": "Rótulo",
+    "enabled": "Ativa",
+    "disabled": "Desativada",
+    "cronStart": "Cron de início",
+    "cronPause": "Cron de pausa",
+    "rateLimit": "Limite (KB/s)",
+    "shutdownAfter": "Desligar PC quando fila esvaziar",
+    "save": "Salvar"
   },
   "status": {
     "downloading": "baixando",

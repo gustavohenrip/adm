@@ -18,10 +18,15 @@
     "remove": "Remove",
     "openFolder": "Open folder",
     "more": "More",
-    "settings": "Settings"
+    "settings": "Settings",
+    "pauseAll": "Pause all",
+    "resumeAll": "Resume all",
+    "bulk": "Bulk actions",
+    "refresh": "Refresh link"
   },
   "sidebar": { "sessionSpeed": "Session speed" },
   "queue": {
+    "advanced": "Advanced",
     "columns": {
       "name": "Name",
       "size": "Size",
@@ -35,6 +40,45 @@
       "items": "{{count}} items · {{total}}",
       "updated": "Updated just now"
     }
+  },
+  "addDialog": {
+    "title": "Add download",
+    "single": "Single",
+    "batch": "Batch",
+    "mirrors": "Mirrors (one per line, optional)",
+    "mirrorsHint": "https://mirror1/file.zip\nhttps://mirror2/file.zip",
+    "segments": "Segments",
+    "checksumAlgo": "Checksum",
+    "checksumExpected": "Expected hash",
+    "folder": "Folder",
+    "folderHint": "Defaults to the download root",
+    "auth": "HTTP authentication",
+    "username": "Username",
+    "password": "Password",
+    "batchUrls": "URL list",
+    "batchUrlsHint": "One URL per line",
+    "pattern": "Pattern (with [001-100])",
+    "submit": "Start",
+    "cancel": "Cancel"
+  },
+  "clipboard": {
+    "detected": "URL detected",
+    "download": "Download",
+    "dismiss": "Dismiss"
+  },
+  "schedule": {
+    "title": "Schedule",
+    "add": "New rule",
+    "loading": "Loading rules…",
+    "empty": "No rules yet. Create one to start or pause the queue automatically.",
+    "label": "Label",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "cronStart": "Start cron",
+    "cronPause": "Pause cron",
+    "rateLimit": "Rate cap (KB/s)",
+    "shutdownAfter": "Shut down PC when queue empties",
+    "save": "Save"
   },
   "status": {
     "downloading": "downloading",
