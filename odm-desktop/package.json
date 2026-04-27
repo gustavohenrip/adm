@@ -1,6 +1,6 @@
 {
   "name": "odm-desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "ODM — Open Downloader Manager desktop shell",
   "main": "src/main.cjs",
   "private": true,
