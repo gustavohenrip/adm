@@ -35,6 +35,7 @@ let discoveryCache = null;
 let settingsCache = normalizeSettings(DEFAULT_SETTINGS);
 const responseCache = new Map();
 const recentIntercepts = new Map();
+const activeSends = new Map();
 
 loadSettings().catch(() => {});
 getHandshake({ force: true }).catch(() => {});
@@ -288,6 +289,14 @@ function downloadPayload(url, options = {}) {
 }
 
 async function sendToOdm(url, options = {}) {
+  const key = requestKey(url);
+  if (activeSends.has(key)) return activeSends.get(key);
+  const task = sendToOdmNow(url, options).finally(() => activeSends.delete(key));
+  activeSends.set(key, task);
+  return task;
+}
+
+async function sendToOdmNow(url, options = {}) {
   const cookieHeader = isHttpUrl(url) ? options.cookieHeader || options.cookies || (await getCookieHeader(url)) : '';
   const body = downloadPayload(url, { ...options, cookieHeader });
   const native = await nativeMessage('enqueue', body);
@@ -307,14 +316,21 @@ async function sendToOdm(url, options = {}) {
   }
 }
 
+function requestKey(url) {
+  const value = String(url || '').trim();
+  const match = /xt=urn:btih:([^&]+)/i.exec(value);
+  if (match) return `torrent:${match[1].toLowerCase()}`;
+  return value.toLowerCase();
+}
+
 function rememberRecent(url) {
-  recentIntercepts.set(url, Date.now());
+  recentIntercepts.set(requestKey(url), Date.now());
   pruneRecent();
 }
 
 function wasRecentlyIntercepted(url) {
   pruneRecent();
-  const at = recentIntercepts.get(url);
+  const at = recentIntercepts.get(requestKey(url));
   return at && Date.now() - at < RECENT_TTL_MS;
 }
 

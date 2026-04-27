@@ -116,8 +116,10 @@ public class TorrentSession {
 
     public String addMagnet(String magnet, Path savePath) {
         Objects.requireNonNull(manager, "torrent session unavailable");
-        manager.download(magnet, savePath.toFile(), TorrentFlags.AUTO_MANAGED);
         String key = magnetKey(magnet);
+        TorrentHandle existing = findHandle(key);
+        if (existing != null) return key;
+        manager.download(magnet, savePath.toFile(), TorrentFlags.AUTO_MANAGED);
         return key == null ? magnet : key;
     }
 

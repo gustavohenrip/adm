@@ -81,18 +81,30 @@ public class TorrentDownloadService {
         String name;
         if (req != null && req.magnet() != null && !req.magnet().isBlank()) {
             url = req.magnet().trim();
-            key = torrents.addMagnet(url, folder);
+            key = sourceKey(TorrentSession.magnetKey(url), url);
+            DownloadEntity existing = reusable(key);
+            if (existing != null) {
+                restoreMissing(existing);
+                return DownloadView.from(existing, 0L);
+            }
+            key = sourceKey(torrents.addMagnet(url, folder), url);
             name = preferredName(req.name(), magnetDisplayName(url, key));
         } else if (req != null && req.torrentUrl() != null && !req.torrentUrl().isBlank()) {
             URI uri = urlGuard.parseOrReject(req.torrentUrl().trim());
             byte[] bytes = downloadTorrentFile(uri);
             TorrentInfo info = new TorrentInfo(bytes);
+            key = info.infoHashV1().toHex();
+            DownloadEntity existing = reusable(key);
+            if (existing != null) return DownloadView.from(existing, 0L);
             key = torrents.addTorrentFile(bytes, folder);
             url = uri.toString();
             name = preferredName(req.name(), torrentName(info, key));
         } else if (req != null && req.torrentBase64() != null && !req.torrentBase64().isBlank()) {
             byte[] bytes = Base64.getDecoder().decode(req.torrentBase64());
             TorrentInfo info = new TorrentInfo(bytes);
+            key = info.infoHashV1().toHex();
+            DownloadEntity existing = reusable(key);
+            if (existing != null) return DownloadView.from(existing, 0L);
             key = torrents.addTorrentFile(bytes, folder);
             url = "torrent:" + key;
             name = preferredName(req.name(), torrentName(info, key));
@@ -181,7 +193,9 @@ public class TorrentDownloadService {
 
     public void remove(String id, boolean deleteFiles) {
         DownloadEntity e = find(id);
-        torrents.remove(e.getSource(), deleteFiles);
+        if (repo.countByKindAndSourceIgnoreCaseAndIdNot(DownloadKind.TORRENT, e.getSource(), id) == 0L) {
+            torrents.remove(e.getSource(), deleteFiles);
+        }
         delete(id);
         progressBus.reset(id);
     }
@@ -191,6 +205,10 @@ public class TorrentDownloadService {
             for (DownloadEntity e : repo.findAllByOrderByCreatedAtDesc()) {
                 if (e.getKind() != DownloadKind.TORRENT) continue;
                 TorrentHandle handle = torrents.handle(e.getSource());
+                if ((handle == null || !handle.isValid()) && e.getStatus() != DownloadStatus.COMPLETE && e.getStatus() != DownloadStatus.FAILED) {
+                    restoreMissing(e);
+                    handle = torrents.handle(e.getSource());
+                }
                 if (handle == null || !handle.isValid()) continue;
                 TorrentStatus status = handle.status();
                 long total = Math.max(0L, status.totalWanted());
@@ -217,6 +235,26 @@ public class TorrentDownloadService {
         return repo.findById(id).orElseThrow(() -> new IllegalArgumentException("torrent not found: " + id));
     }
 
+    private DownloadEntity reusable(String source) {
+        if (source == null || source.isBlank()) return null;
+        return repo.findFirstByKindAndSourceIgnoreCaseOrderByCreatedAtDesc(DownloadKind.TORRENT, source)
+                .filter(e -> e.getStatus() != DownloadStatus.FAILED)
+                .orElse(null);
+    }
+
+    private void restoreMissing(DownloadEntity e) {
+        if (e == null || e.getUrl() == null || !e.getUrl().regionMatches(true, 0, "magnet:", 0, 7)) return;
+        try {
+            if (torrents.handle(e.getSource()) != null) return;
+            Path folder = resolveFolder(e.getFolder());
+            String source = sourceKey(torrents.addMagnet(e.getUrl(), folder), e.getUrl());
+            e.setSource(source);
+            if (e.getStatus() == DownloadStatus.PAUSED) torrents.pause(source);
+            save(e);
+        } catch (Exception ignored) {
+        }
+    }
+
     private Path resolveFolder(String folder) throws Exception {
         String root = settings.get().getOrDefault("downloadRoot", System.getProperty("user.home") + "/Downloads/ODM");
         Path path = folder == null || folder.isBlank()
@@ -232,6 +270,11 @@ public class TorrentDownloadService {
             return Paths.get(System.getProperty("user.home"), value.substring(2));
         }
         return Paths.get(value);
+    }
+
+    private String sourceKey(String key, String fallback) {
+        if (key != null && !key.isBlank()) return key.trim();
+        return fallback == null ? "magnet" : fallback.trim();
     }
 
     private String shortKey(String key) {

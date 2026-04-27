@@ -10,6 +10,7 @@ const isDev = process.env.ODM_DEV === '1';
 let mainWindow = null;
 let quitting = false;
 let pendingIncomingUrls = [];
+const recentIncomingUrls = new Map();
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -49,6 +50,8 @@ function normalizeIncomingUrl(url) {
 function handleIncomingUrl(url) {
   const normalized = normalizeIncomingUrl(url);
   if (!normalized) return;
+  if (recentIncoming(normalized)) return;
+  rememberIncoming(normalized);
   if (!mainWindow) {
     pendingIncomingUrls.push(normalized);
     if (app.isReady()) createWindow();
@@ -65,6 +68,26 @@ function flushIncomingUrls() {
   const pending = pendingIncomingUrls;
   pendingIncomingUrls = [];
   for (const url of pending) mainWindow.webContents.send('odm:incomingUrl', url);
+}
+
+function incomingKey(url) {
+  const value = String(url || '').trim();
+  const match = /xt=urn:btih:([^&]+)/i.exec(value);
+  if (match) return `torrent:${match[1].toLowerCase()}`;
+  return value.toLowerCase();
+}
+
+function recentIncoming(url) {
+  const now = Date.now();
+  for (const [key, at] of recentIncomingUrls) {
+    if (now - at > 45_000) recentIncomingUrls.delete(key);
+  }
+  const key = incomingKey(url);
+  return recentIncomingUrls.has(key);
+}
+
+function rememberIncoming(url) {
+  recentIncomingUrls.set(incomingKey(url), Date.now());
 }
 
 function createWindow() {
