@@ -15,6 +15,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -87,8 +88,9 @@ public class TorrentDownloadService {
                 restoreMissing(existing);
                 return DownloadView.from(existing, 0L);
             }
-            key = sourceKey(torrents.addMagnet(url, folder), url);
             name = preferredName(req.name(), magnetDisplayName(url, key));
+            prepareTarget(folder, name, req.overwrite());
+            key = sourceKey(torrents.addMagnet(url, folder), url);
         } else if (req != null && req.torrentUrl() != null && !req.torrentUrl().isBlank()) {
             URI uri = urlGuard.parseOrReject(req.torrentUrl().trim());
             byte[] bytes = downloadTorrentFile(uri);
@@ -96,18 +98,20 @@ public class TorrentDownloadService {
             key = info.infoHashV1().toHex();
             DownloadEntity existing = reusable(key);
             if (existing != null) return DownloadView.from(existing, 0L);
+            name = preferredName(req.name(), torrentName(info, key));
+            prepareTarget(folder, name, req.overwrite());
             key = torrents.addTorrentFile(bytes, folder);
             url = uri.toString();
-            name = preferredName(req.name(), torrentName(info, key));
         } else if (req != null && req.torrentBase64() != null && !req.torrentBase64().isBlank()) {
             byte[] bytes = Base64.getDecoder().decode(req.torrentBase64());
             TorrentInfo info = new TorrentInfo(bytes);
             key = info.infoHashV1().toHex();
             DownloadEntity existing = reusable(key);
             if (existing != null) return DownloadView.from(existing, 0L);
+            name = preferredName(req.name(), torrentName(info, key));
+            prepareTarget(folder, name, req.overwrite());
             key = torrents.addTorrentFile(bytes, folder);
             url = "torrent:" + key;
-            name = preferredName(req.name(), torrentName(info, key));
         } else {
             throw new IllegalArgumentException("magnet, torrentUrl or torrentBase64 required");
         }
@@ -148,27 +152,27 @@ public class TorrentDownloadService {
                     size = Math.max(0L, info.totalSize());
                 }
             }
-            TorrentCreateRequest normalized = new TorrentCreateRequest(magnet, null, null, req.folder(), name);
+            TorrentCreateRequest normalized = new TorrentCreateRequest(magnet, null, null, req.folder(), name, null);
             return new DownloadPreview(id, "torrent", name, key == null ? "magnet" : key, magnet,
-                    folder.toString(), size, false, 1, null, normalized);
+                    folder.toString(), size, false, 1, null, normalized, Files.exists(folder.resolve(name)));
         }
         if (req != null && req.torrentUrl() != null && !req.torrentUrl().isBlank()) {
             URI uri = urlGuard.parseOrReject(req.torrentUrl().trim());
             TorrentInfo info = new TorrentInfo(downloadTorrentFile(uri));
             String key = info.infoHashV1().toHex();
             String name = torrentName(info, key);
-            TorrentCreateRequest normalized = new TorrentCreateRequest(null, uri.toString(), null, req.folder(), name);
+            TorrentCreateRequest normalized = new TorrentCreateRequest(null, uri.toString(), null, req.folder(), name, null);
             return new DownloadPreview(id, "torrent", name, key, uri.toString(), folder.toString(),
-                    Math.max(0L, info.totalSize()), false, 1, null, normalized);
+                    Math.max(0L, info.totalSize()), false, 1, null, normalized, Files.exists(folder.resolve(name)));
         }
         if (req != null && req.torrentBase64() != null && !req.torrentBase64().isBlank()) {
             byte[] bytes = Base64.getDecoder().decode(req.torrentBase64());
             TorrentInfo info = new TorrentInfo(bytes);
             String key = info.infoHashV1().toHex();
             String name = torrentName(info, key);
-            TorrentCreateRequest normalized = new TorrentCreateRequest(null, null, req.torrentBase64(), req.folder(), name);
+            TorrentCreateRequest normalized = new TorrentCreateRequest(null, null, req.torrentBase64(), req.folder(), name, null);
             return new DownloadPreview(id, "torrent", name, key, "torrent:" + key, folder.toString(),
-                    Math.max(0L, info.totalSize()), false, 1, null, normalized);
+                    Math.max(0L, info.totalSize()), false, 1, null, normalized, Files.exists(folder.resolve(name)));
         }
         throw new IllegalArgumentException("magnet, torrentUrl or torrentBase64 required");
     }
@@ -262,6 +266,24 @@ public class TorrentDownloadService {
                 : pathFrom(folder);
         Files.createDirectories(path);
         return path.toRealPath();
+    }
+
+    private void prepareTarget(Path folder, String name, Boolean overwrite) throws Exception {
+        Path target = folder.resolve(sanitizeName(name)).normalize();
+        if (!target.startsWith(folder)) throw new IllegalArgumentException("target path is outside download folder");
+        if (!Files.exists(target)) return;
+        if (!Boolean.TRUE.equals(overwrite)) throw new IllegalArgumentException("target already exists");
+        deleteTarget(target);
+    }
+
+    private void deleteTarget(Path target) throws IOException {
+        if (Files.isDirectory(target)) {
+            try (var stream = Files.walk(target)) {
+                for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+            }
+            return;
+        }
+        Files.deleteIfExists(target);
     }
 
     private Path pathFrom(String value) {

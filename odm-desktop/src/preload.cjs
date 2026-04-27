@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('odm', {
   getBackendInfo: () => ipcRenderer.invoke('odm:getBackendInfo'),
   openFolder: (folderPath) => ipcRenderer.invoke('odm:openFolder', folderPath),
   selectFolder: (folderPath) => ipcRenderer.invoke('odm:selectFolder', folderPath),
+  confirmOverwrite: (folderPath, filename) => ipcRenderer.invoke('odm:confirmOverwrite', folderPath, filename),
   onClipboardUrl: (handler) => {
     const listener = (_e, url) => handler(url);
     ipcRenderer.on('odm:urlFromClipboard', listener);

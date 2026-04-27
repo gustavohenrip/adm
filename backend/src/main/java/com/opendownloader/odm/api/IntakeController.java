@@ -47,10 +47,10 @@ public class IntakeController {
         }
         String url = payload.url().trim();
         if (url.regionMatches(true, 0, "magnet:", 0, 7)) {
-            return torrents.preview(new TorrentCreateRequest(url, null, null, payload.folder(), null));
+            return torrents.preview(new TorrentCreateRequest(url, null, null, payload.folder(), null, null));
         }
         if (url.matches("(?i)^https?://.*\\.torrent(?:[?#].*)?$")) {
-            return torrents.preview(new TorrentCreateRequest(null, url, null, payload.folder(), null));
+            return torrents.preview(new TorrentCreateRequest(null, url, null, payload.folder(), null, null));
         }
         return downloads.preview(payload);
     }

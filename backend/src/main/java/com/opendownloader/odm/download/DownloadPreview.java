@@ -11,6 +11,7 @@ public record DownloadPreview(
         boolean acceptsRanges,
         int segments,
         DownloadCreateRequest http,
-        com.opendownloader.odm.download.torrent.TorrentCreateRequest torrent
+        com.opendownloader.odm.download.torrent.TorrentCreateRequest torrent,
+        boolean targetExists
 ) {
 }

@@ -10,3 +10,4 @@
 - 2026-04-27: Em zsh, `status` e variavel reservada. Usar nomes como `cmd_status` ao validar comandos no shell.
 - 2026-04-27: Antes de depender do CI, validar `npm ci --dry-run` nos pacotes alterados. Atualizar versao sozinho nao garante lockfile sincronizado.
 - 2026-04-27: Magnet pode chegar ao app por extensao e protocolo ao mesmo tempo. Deduplicar por hash/URL, nao por ID de preview.
+- 2026-04-27: Ao pedir "substituir arquivo", confirmar no app e tambem enviar flag ao backend para apagar o destino. So perguntar sem mudar o backend vira resume parcial.

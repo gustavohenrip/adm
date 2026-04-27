@@ -35,6 +35,7 @@ export interface DownloadCreateRequest {
   sizeBytes?: number;
   acceptsRanges?: boolean;
   probe?: boolean;
+  overwrite?: boolean;
 }
 
 export interface BatchDownloadRequest {
@@ -52,6 +53,7 @@ export interface TorrentCreateRequest {
   torrentBase64?: string;
   folder?: string;
   name?: string;
+  overwrite?: boolean;
 }
 
 export interface DownloadPreview {
@@ -66,6 +68,7 @@ export interface DownloadPreview {
   segments: number;
   http?: DownloadCreateRequest;
   torrent?: TorrentCreateRequest;
+  targetExists?: boolean;
 }
 
 export interface ScheduleRule {

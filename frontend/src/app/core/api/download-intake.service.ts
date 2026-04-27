@@ -10,6 +10,7 @@ type OdmBridge = {
   onClipboardUrl?: (handler: (url: string) => void) => () => void;
   onIncomingUrl?: (handler: (url: string) => void) => () => void;
   selectFolder?: (current?: string) => Promise<string>;
+  confirmOverwrite?: (folder: string, filename: string) => Promise<{ proceed: boolean; overwrite: boolean }>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -104,15 +105,19 @@ export class DownloadIntakeService {
     this.showNext();
   }
 
-  confirm(): void {
+  async confirm(): Promise<void> {
     const preview = this.pending();
-    if (!preview) return;
+    if (!preview || this.busy()) return;
+    const folder = this.useDefaultFolder() ? undefined : this.selectedFolder().trim();
+    const finalFolder = folder || preview.folder || preview.http?.folder || preview.torrent?.folder || '';
+    const filename = this.targetName(preview);
+    const overwrite = await this.confirmOverwrite(finalFolder, filename, !!preview.targetExists);
+    if (!overwrite.proceed) return;
     this.busy.set(true);
     this.error.set('');
-    const folder = this.useDefaultFolder() ? undefined : this.selectedFolder().trim();
     const request = preview.kind === 'torrent' && preview.torrent
-      ? this.downloads.addTorrent({ ...preview.torrent, folder: folder || preview.torrent.folder })
-      : this.downloads.create({ ...(preview.http ?? { url: preview.url }), folder: folder || preview.http?.folder });
+      ? this.downloads.addTorrent({ ...preview.torrent, folder: folder || preview.torrent.folder, overwrite: overwrite.overwrite || undefined })
+      : this.downloads.create({ ...(preview.http ?? { url: preview.url }), folder: folder || preview.http?.folder, overwrite: overwrite.overwrite || undefined });
     request.subscribe({
       next: (download) => {
         this.store.mergeOne(download);
@@ -156,6 +161,26 @@ export class DownloadIntakeService {
     this.useDefaultFolder.set(true);
     this.error.set('');
     this.router.navigateByUrl('/queue');
+  }
+
+  private async confirmOverwrite(folder: string, filename: string, knownExists: boolean): Promise<{ proceed: boolean; overwrite: boolean }> {
+    if (!folder || !filename) return { proceed: true, overwrite: false };
+    const odm = this.bridge();
+    if (odm?.confirmOverwrite) {
+      try {
+        return await odm.confirmOverwrite(folder, filename);
+      } catch {
+        return { proceed: false, overwrite: false };
+      }
+    }
+    if (!knownExists) return { proceed: true, overwrite: false };
+    const proceed = globalThis.confirm(`"${filename}" já existe nesta pasta. Deseja substituir?`);
+    return { proceed, overwrite: proceed };
+  }
+
+  private targetName(preview: DownloadPreview): string {
+    if (preview.kind === 'http') return preview.http?.filename || preview.name;
+    return preview.torrent?.name || preview.name;
   }
 
   private cleanUrl(url: string): string {
@@ -259,6 +284,7 @@ export class DownloadIntakeService {
       acceptsRanges: false,
       segments: 1,
       torrent: { magnet, name },
+      targetExists: false,
     };
   }
 

@@ -5,6 +5,7 @@ public record TorrentCreateRequest(
         String torrentUrl,
         String torrentBase64,
         String folder,
-        String name
+        String name,
+        Boolean overwrite
 ) {
 }

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { startBackend, stopBackend, getBackendInfo } = require('./backend-sidecar.cjs');
 const clipboardWatcher = require('./clipboard-watcher.cjs');
 const tray = require('./tray.cjs');
@@ -164,6 +165,27 @@ if (gotTheLock) app.whenReady().then(async () => {
       properties: ['openDirectory', 'createDirectory'],
     });
     return result.canceled ? '' : result.filePaths[0] || '';
+  });
+  ipcMain.handle('odm:confirmOverwrite', async (_event, folderPath, filename) => {
+    if (typeof folderPath !== 'string' || typeof filename !== 'string') return { proceed: false, overwrite: false };
+    const cleanName = filename.trim();
+    if (!folderPath.trim() || !cleanName || cleanName.includes('/') || cleanName.includes('\\') || cleanName === '.' || cleanName === '..') return { proceed: false, overwrite: false };
+    const base = path.resolve(folderPath);
+    const target = path.resolve(base, cleanName);
+    const relative = path.relative(base, target);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return { proceed: false, overwrite: false };
+    if (!fs.existsSync(target)) return { proceed: true, overwrite: false };
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: 'Arquivo já existe',
+      message: `"${cleanName}" já existe nesta pasta.`,
+      detail: target,
+      buttons: ['Substituir', 'Cancelar'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    });
+    return { proceed: result.response === 0, overwrite: result.response === 0 };
   });
 
   try {

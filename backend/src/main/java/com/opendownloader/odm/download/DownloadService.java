@@ -114,6 +114,10 @@ public class DownloadService {
     public DownloadView create(DownloadCreateRequest req) throws Exception {
         PreviewParts parts = buildPreviewParts(req);
         String id = UUID.randomUUID().toString();
+        if (Files.exists(parts.target())) {
+            if (!Boolean.TRUE.equals(req.overwrite())) throw new IllegalArgumentException("target already exists");
+            Files.deleteIfExists(parts.target());
+        }
 
         DownloadEntity e = new DownloadEntity();
         e.setId(id);
@@ -123,7 +127,7 @@ public class DownloadService {
         e.setUrl(parts.info().finalUrl());
         e.setSource(hostLabel(parts.uri()));
         e.setSizeBytes(parts.size());
-        e.setDownloadedBytes(existingSize(parts.target()));
+        e.setDownloadedBytes(0L);
         e.setStatus(DownloadStatus.QUEUED);
         e.setFolder(parts.target().getParent().toString());
         e.setFilename(parts.filename());
@@ -160,11 +164,12 @@ public class DownloadService {
                 parts.filename(),
                 parts.size(),
                 parts.info().acceptsRanges(),
-                Boolean.FALSE
+                Boolean.FALSE,
+                null
         );
         return new DownloadPreview(UUID.randomUUID().toString(), "http", parts.filename(), hostLabel(parts.uri()),
                 parts.info().finalUrl(), parts.target().getParent().toString(), parts.size(),
-                parts.info().acceptsRanges(), parts.segments(), normalized, null);
+                parts.info().acceptsRanges(), parts.segments(), normalized, null, Files.exists(parts.target()));
     }
 
     public DownloadView pause(String id) {
