@@ -1,7 +1,7 @@
 import { Injectable, NgZone, inject, signal } from '@angular/core';
 import { Client, IMessage } from '@stomp/stompjs';
 
-import { Download } from '../api/download.model';
+import { Download, DownloadPreview } from '../api/download.model';
 import { BackendConfigService } from '../api/backend-config.service';
 
 export interface SystemEvent {
@@ -17,6 +17,7 @@ export class ProgressGateway {
 
   readonly connected = signal(false);
   readonly updates = signal<Download[]>([]);
+  readonly intakes = signal<DownloadPreview[]>([]);
   readonly systemEvent = signal<SystemEvent | null>(null);
 
   async connect(): Promise<void> {
@@ -32,6 +33,7 @@ export class ProgressGateway {
       onConnect: () => {
         this.zone.run(() => this.connected.set(true));
         this.client?.subscribe('/topic/progress', (msg: IMessage) => this.onProgress(msg));
+        this.client?.subscribe('/topic/intake', (msg: IMessage) => this.onIntake(msg));
         this.client?.subscribe('/topic/system', (msg: IMessage) => this.onSystem(msg));
       },
       onDisconnect: () => this.zone.run(() => this.connected.set(false)),
@@ -59,6 +61,16 @@ export class ProgressGateway {
         return { ...item, progress, speedBps };
       });
       this.zone.run(() => this.updates.set(normalized));
+    } catch {}
+  }
+
+  private onIntake(msg: IMessage): void {
+    try {
+      const payload = JSON.parse(msg.body) as DownloadPreview[];
+      this.zone.run(() => this.intakes.set(payload.map((item) => ({
+        ...item,
+        kind: String(item.kind ?? '').toLowerCase() as DownloadPreview['kind'],
+      }))));
     } catch {}
   }
 

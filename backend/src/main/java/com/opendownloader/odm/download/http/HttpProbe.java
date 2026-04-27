@@ -14,29 +14,34 @@ public final class HttpProbe {
     private HttpProbe() { }
 
     public static Info probe(HttpClient client, URI uri) throws Exception {
-        HttpRequest head = HttpRequest.newBuilder(uri)
+        return probe(client, uri, HttpRequestHeaders.emptyHeaders());
+    }
+
+    public static Info probe(HttpClient client, URI uri, HttpRequestHeaders headers) throws Exception {
+        headers = headers == null ? HttpRequestHeaders.emptyHeaders() : headers;
+        HttpRequest.Builder headBuilder = HttpRequest.newBuilder(uri)
                 .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                .timeout(Duration.ofSeconds(30))
-                .build();
+                .timeout(Duration.ofSeconds(30));
+        headers.apply(headBuilder);
         HttpResponse<Void> res;
         try {
-            res = client.send(head, HttpResponse.BodyHandlers.discarding());
+            res = client.send(headBuilder.build(), HttpResponse.BodyHandlers.discarding());
         } catch (Exception e) {
-            return rangeProbe(client, uri);
+            return rangeProbe(client, uri, headers);
         }
         if (res.statusCode() / 100 != 2) {
-            return rangeProbe(client, uri);
+            return rangeProbe(client, uri, headers);
         }
         return fromHeaders(res, uri);
     }
 
-    private static Info rangeProbe(HttpClient client, URI uri) throws Exception {
-        HttpRequest rangeReq = HttpRequest.newBuilder(uri)
+    private static Info rangeProbe(HttpClient client, URI uri, HttpRequestHeaders headers) throws Exception {
+        HttpRequest.Builder rangeBuilder = HttpRequest.newBuilder(uri)
                 .GET()
                 .header("Range", "bytes=0-0")
-                .timeout(Duration.ofSeconds(30))
-                .build();
-        HttpResponse<Void> res = client.send(rangeReq, HttpResponse.BodyHandlers.discarding());
+                .timeout(Duration.ofSeconds(30));
+        headers.apply(rangeBuilder);
+        HttpResponse<Void> res = client.send(rangeBuilder.build(), HttpResponse.BodyHandlers.discarding());
         return fromHeaders(res, uri);
     }
 

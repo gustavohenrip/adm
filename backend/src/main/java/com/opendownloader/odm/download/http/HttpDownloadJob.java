@@ -33,16 +33,25 @@ public final class HttpDownloadJob implements DownloadRunner {
     private final ProgressBus progressBus;
     private final RateLimiter rateLimiter;
     private final int bufferSize;
+    private final HttpRequestHeaders headers;
     private final AtomicBoolean stopFlag = new AtomicBoolean(false);
 
     public HttpDownloadJob(String id, HttpClient client, URI uri, Path target,
                            long totalSize, boolean acceptsRanges, ProgressBus bus, RateLimiter rateLimiter) {
-        this(id, client, uri, target, totalSize, acceptsRanges, bus, rateLimiter, DEFAULT_BUFFER_SIZE);
+        this(id, client, uri, target, totalSize, acceptsRanges, bus, rateLimiter, DEFAULT_BUFFER_SIZE,
+                HttpRequestHeaders.emptyHeaders());
     }
 
     public HttpDownloadJob(String id, HttpClient client, URI uri, Path target,
                            long totalSize, boolean acceptsRanges, ProgressBus bus, RateLimiter rateLimiter,
                            int bufferSize) {
+        this(id, client, uri, target, totalSize, acceptsRanges, bus, rateLimiter, bufferSize,
+                HttpRequestHeaders.emptyHeaders());
+    }
+
+    public HttpDownloadJob(String id, HttpClient client, URI uri, Path target,
+                           long totalSize, boolean acceptsRanges, ProgressBus bus, RateLimiter rateLimiter,
+                           int bufferSize, HttpRequestHeaders headers) {
         this.id = id;
         this.client = client;
         this.uri = uri;
@@ -52,6 +61,7 @@ public final class HttpDownloadJob implements DownloadRunner {
         this.progressBus = bus;
         this.rateLimiter = rateLimiter;
         this.bufferSize = Math.max(8 * 1024, bufferSize);
+        this.headers = headers == null ? HttpRequestHeaders.emptyHeaders() : headers;
     }
 
     public void stop() {
@@ -70,6 +80,7 @@ public final class HttpDownloadJob implements DownloadRunner {
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .GET()
                 .timeout(Duration.ofMinutes(10));
+        headers.apply(builder);
         if (existing > 0 && acceptsRanges) {
             builder.header("Range", "bytes=" + existing + "-");
         }

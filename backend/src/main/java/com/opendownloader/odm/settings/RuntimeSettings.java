@@ -100,7 +100,7 @@ public class RuntimeSettings {
     }
 
     private void apply(Map<String, String> values) {
-        int maxSegments = parseInt(values.get("maxSegments"), downloads.getMaxSegments(), 1, 32);
+        int maxSegments = parseInt(values.get("maxSegments"), downloads.getMaxSegments(), 1, 64);
         boolean torrentChanged = torrents.isEnabled() != parseBoolean(values.get("torrentEnabled"), torrents.isEnabled())
                 || torrents.isDhtEnabled() != parseBoolean(values.get("dhtEnabled"), torrents.isDhtEnabled())
                 || torrents.isLsdEnabled() != parseBoolean(values.get("lsdEnabled"), torrents.isLsdEnabled())
@@ -108,7 +108,9 @@ public class RuntimeSettings {
         downloads.setRoot(values.get("downloadRoot"));
         downloads.setMaxSegments(maxSegments);
         downloads.setDefaultSegments(parseInt(values.get("defaultSegments"), downloads.getDefaultSegments(), 1, maxSegments));
-        rateLimiter.setLimit(parseLong(values.get("rateLimitKbps"), 0L, 0L, 10_000_000L) * 1024L);
+        long rateLimitBps = parseLong(values.get("rateLimitKbps"), 0L, 0L, 10_000_000L) * 1024L;
+        rateLimiter.setLimit(rateLimitBps);
+        torrentSession.applyDownloadRateLimit(rateLimitBps);
         torrents.setEnabled(parseBoolean(values.get("torrentEnabled"), torrents.isEnabled()));
         torrents.setDhtEnabled(parseBoolean(values.get("dhtEnabled"), torrents.isDhtEnabled()));
         torrents.setLsdEnabled(parseBoolean(values.get("lsdEnabled"), torrents.isLsdEnabled()));
@@ -141,7 +143,7 @@ public class RuntimeSettings {
         Map<String, String> defaultValues = defaults();
         Map<String, String> values = new HashMap<>();
         values.put("downloadRoot", stringValue(base.get("downloadRoot"), defaultValues.get("downloadRoot")));
-        int maxSegments = parseInt(base.get("maxSegments"), downloads.getMaxSegments(), 1, 32);
+        int maxSegments = parseInt(base.get("maxSegments"), downloads.getMaxSegments(), 1, 64);
         values.put("maxSegments", Integer.toString(maxSegments));
         values.put("defaultSegments", Integer.toString(parseInt(base.get("defaultSegments"), downloads.getDefaultSegments(), 1, maxSegments)));
         values.put("rateLimitKbps", Long.toString(parseLong(base.get("rateLimitKbps"), 0L, 0L, 10_000_000L)));

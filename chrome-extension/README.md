@@ -6,51 +6,43 @@ links and for downloads triggered through a click or redirect.
 
 ## How it works
 
-1. The ODM desktop app writes a handshake file at `~/.odm/handshake.json`
-   with the local backend port and session token, and registers a Native
-   Messaging host (`com.odm.bridge`) for Chrome, Chromium, Edge, Brave
-   and Firefox.
-2. The browser extension intercepts `chrome.downloads.onCreated`, decides
-   if the file should go to ODM (size, extension, host filters) and asks
-   the native host to forward the URL plus referer and cookies to the
-   backend over HTTP.
-3. ODM creates the download with multi-segment, mirrors and the rate
-   limiter that the desktop app has configured.
+1. The ODM desktop app installs a Chrome Native Messaging host for the
+   fixed extension ID `fnmhbcgfgoaghnknfdeehccahpepkngm`.
+2. The browser extension captures direct download clicks before navigation,
+   watches download response headers through `webRequest`, and keeps
+   `chrome.downloads.onCreated` only as a fallback.
+3. The extension forwards URL, filename, size, referer, cookies and
+   user-agent through the native bridge so ODM can make the first real
+   download request itself.
+4. ODM creates the download with the rate limiter and download settings
+   configured in the desktop app.
 
 ## Install
 
 ### 1. Run ODM desktop at least once
 
-The desktop app installs the native messaging manifest in the right
-folders for every browser it detects (`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.odm.bridge.json`
-on macOS, `~/.config/google-chrome/NativeMessagingHosts/com.odm.bridge.json`
-on Linux, etc.). It also writes the handshake file the host reads on
-each request.
-
-Open ODM, then close it once before installing the extension.
+Open ODM once before installing or reloading the extension. This installs
+the native bridge Chrome needs.
 
 ### 2. Load the extension unpacked
 
 1. Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`).
 2. Enable **Developer mode**.
 3. Click **Load unpacked** and pick this `chrome-extension/` folder.
-4. Note the **Extension ID** Chrome assigns. The default install allows
-   any extension ID; if you want to lock it down edit
-   `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.odm.bridge.json`
-   and change `allowed_origins` to `chrome-extension://YOUR_ID/`.
+4. Confirm Chrome shows extension ID `fnmhbcgfgoaghnknfdeehccahpepkngm`.
 
 ### 3. Verify the bridge
 
 Click the extension toolbar icon. The popup should show **Connected**
 along with the local backend URL. If it says **ODM not running**, start
-the desktop app. If it says **Bridge unreachable**, restart the browser
-once so the new native messaging manifest is picked up.
+the desktop app and reload the extension.
 
 ## Usage
 
-- Direct link clicks and redirects that Chrome would normally save to
-  Downloads are sent to ODM instead. The native Chrome download is
-  cancelled and removed from the shelf.
+- Direct download clicks are stopped before Chrome spends the URL, then
+  sent to ODM with the same cookies, referer and user-agent.
+- Downloads detected only after Chrome creates a download item still use
+  the fallback path and are cancelled as quickly as Chrome allows.
 - Right-click a link or a page → **Send link to ODM** / **Send page URL
   to ODM** to enqueue manually.
 - Use the popup toggle to disable interception temporarily.
@@ -59,7 +51,7 @@ once so the new native messaging manifest is picked up.
 
 ## Filters (defaults)
 
-- Minimum size: **256 KB**
+- Minimum size: **0 KB**
 - Always intercept: archives (zip/rar/7z/...), iso/dmg/pkg, exe/msi/deb/rpm,
   video/audio, pdf and epub.
 - Skipped hosts: `mail.google.com`, `docs.google.com`, `drive.google.com`.
@@ -69,19 +61,16 @@ Edit any of these in the options page.
 
 ## Troubleshooting
 
-- **Popup says “Bridge unreachable”** — restart the browser. The native
-  messaging manifest is loaded once at startup. Make sure the file
-  `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.odm.bridge.json`
-  exists and points to a script that is executable (`chmod +x`).
-- **Popup says “ODM not running”** — open the ODM desktop app. The
-  handshake file lives at `~/.odm/handshake.json` and is rewritten on
-  every backend start.
+- **Popup says “Bridge unreachable”** — open ODM once, then reload the
+  extension. ODM installs the native host used by Chrome.
+- **Popup says “ODM not running”** — open the ODM desktop app.
 - **Downloads still happen in Chrome** — open the extension popup and
   confirm the toggle is on. Files smaller than the minimum size and not
   on the allow list stay in Chrome.
-- **Locked-down corporate Chrome** — `nativeMessaging` requires the
-  policy to allow it. Check `chrome://policy` for any
-  `NativeMessagingBlocklist` entries.
+- **Some redirect-only downloads still touch Chrome first** — normal
+  Chrome Manifest V3 does not allow consumer extensions to block every
+  response-level request. Direct clicks are intercepted before Chrome
+  spends the URL; the download API path remains a fallback.
 
 ## Pack for the Web Store later
 

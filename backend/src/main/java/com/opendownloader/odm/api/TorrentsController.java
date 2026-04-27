@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.opendownloader.odm.download.DownloadPreview;
 import com.opendownloader.odm.download.DownloadView;
 import com.opendownloader.odm.download.torrent.TorrentCreateRequest;
 import com.opendownloader.odm.download.torrent.TorrentDownloadService;
@@ -23,5 +24,10 @@ public class TorrentsController {
     @PostMapping
     public ResponseEntity<DownloadView> add(@RequestBody TorrentCreateRequest body) throws Exception {
         return ResponseEntity.accepted().body(torrents.create(body));
+    }
+
+    @PostMapping("/preview")
+    public ResponseEntity<DownloadPreview> preview(@RequestBody TorrentCreateRequest body) throws Exception {
+        return ResponseEntity.ok(torrents.preview(body));
     }
 }

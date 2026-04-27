@@ -40,7 +40,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            target: exe
+            artifact: odm-Windows
+          - os: ubuntu-latest
+            target: linux
+            artifact: odm-Linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -51,59 +57,19 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
-      - name: Build backend jar
-        working-directory: backend
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            odm-desktop/package-lock.json
+      - name: Build installer
         shell: bash
-        run: |
-          chmod +x ./gradlew || true
-          ./gradlew --no-daemon bootJar -x test
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          npm install --no-audit --no-fund --ignore-scripts
-          npx ng build --configuration=production
-      - name: Stage backend + ui for electron
-        shell: bash
-        run: |
-          mkdir -p resources/backend resources/jdk odm-desktop/app
-          cp backend/build/libs/*.jar resources/backend/odm-backend.jar
-          cp -R "$JAVA_HOME"/. resources/jdk/
-          cp -R frontend/dist/frontend/browser/* odm-desktop/app/
-      - name: Verify packaged frontend
-        shell: bash
-        run: |
-          test -f odm-desktop/app/index.html
-          grep -q '<base href="./">' odm-desktop/app/index.html
-      - name: Electron package
-        working-directory: odm-desktop
-        shell: bash
-        run: |
-          npm install --no-audit --no-fund
-          if [[ "$RUNNER_OS" == "macOS" && -z "${CSC_LINK:-}" ]]; then
-            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
-            export CSC_IDENTITY_AUTO_DISCOVERY=false
-            npx electron-builder --publish never -c.mac.identity=-
-          else
-            npx electron-builder --publish never
-          fi
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Verify macOS app signature
-        if: runner.os == 'macOS'
-        working-directory: odm-desktop
-        run: |
-          codesign --verify --deep --strict --verbose=4 "dist/mac-arm64/ODM.app"
+        run: node Build/build-app.mjs ${{ matrix.target }} --ci
       - name: Upload package artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: odm-${{ runner.os }}
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            odm-desktop/dist/*.dmg
             odm-desktop/dist/*.exe
             odm-desktop/dist/*.AppImage
             odm-desktop/dist/*.blockmap

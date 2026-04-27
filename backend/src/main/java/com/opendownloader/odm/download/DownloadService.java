@@ -28,6 +28,7 @@ import com.opendownloader.odm.download.http.DownloadRunner;
 import com.opendownloader.odm.download.http.HttpClientBuilder;
 import com.opendownloader.odm.download.http.HttpDownloadJob;
 import com.opendownloader.odm.download.http.HttpProbe;
+import com.opendownloader.odm.download.http.HttpRequestHeaders;
 import com.opendownloader.odm.download.http.MultiSegmentDownloader;
 import com.opendownloader.odm.download.queue.RateLimiter;
 import com.opendownloader.odm.download.queue.RetryPolicy;
@@ -80,6 +81,11 @@ public class DownloadService {
     public void start() {
         repo.findAll().forEach(d -> {
             if (d.getSizeBytes() > 0 && d.getDownloadedBytes() >= d.getSizeBytes() && d.getStatus() != DownloadStatus.COMPLETE) {
+                if (d.getKind() == DownloadKind.HTTP && existingSize(targetPath(d)) < d.getSizeBytes()) {
+                    d.setStatus(DownloadStatus.PAUSED);
+                    save(d);
+                    return;
+                }
                 d.setStatus(DownloadStatus.COMPLETE);
                 if (d.getCompletedAt() == null) d.setCompletedAt(Instant.now());
                 save(d);
@@ -106,54 +112,59 @@ public class DownloadService {
     }
 
     public DownloadView create(DownloadCreateRequest req) throws Exception {
-        if (req == null || req.url() == null || req.url().isBlank()) {
-            throw new IllegalArgumentException("url is required");
-        }
-        URI uri = urlGuard.parseOrReject(req.url().trim());
-        List<URI> mirrors = parseMirrors(req.mirrors());
-        if (props.isDnsPrefetch()) {
-            List<URI> all = new ArrayList<>(mirrors);
-            all.add(uri);
-            ConnectionWarmer.prefetchDns(all);
-        }
-        HttpClient client = clientFor(req);
-        if (props.isTcpPrewarm()) {
-            List<URI> all = new ArrayList<>(mirrors);
-            all.add(uri);
-            ConnectionWarmer.prewarmTcp(client, all);
-        }
-        HttpProbe.Info info = HttpProbe.probe(client, uri);
+        PreviewParts parts = buildPreviewParts(req);
         String id = UUID.randomUUID().toString();
-        String filename = sanitizeFilename(info.filename());
-        Path root = resolveRoot(req.folder());
-        Path target = categorizer.resolve(root, filename).normalize();
-        ensureInside(root, target);
-        Files.createDirectories(target.getParent());
-        long size = Math.max(0L, info.contentLength());
-        int segments = normalizeSegments(req.segments(), info.acceptsRanges(), size);
 
         DownloadEntity e = new DownloadEntity();
         e.setId(id);
         e.setKind(DownloadKind.HTTP);
-        e.setName(filename);
-        e.setExt(categorizer.extOf(filename));
-        e.setUrl(info.finalUrl());
-        e.setSource(hostLabel(uri));
-        e.setSizeBytes(size);
-        e.setDownloadedBytes(existingSize(target));
+        e.setName(parts.filename());
+        e.setExt(categorizer.extOf(parts.filename()));
+        e.setUrl(parts.info().finalUrl());
+        e.setSource(hostLabel(parts.uri()));
+        e.setSizeBytes(parts.size());
+        e.setDownloadedBytes(existingSize(parts.target()));
         e.setStatus(DownloadStatus.QUEUED);
-        e.setFolder(target.getParent().toString());
-        e.setFilename(filename);
-        e.setAcceptsRanges(info.acceptsRanges());
-        e.setSegments(segments);
+        e.setFolder(parts.target().getParent().toString());
+        e.setFilename(parts.filename());
+        e.setAcceptsRanges(parts.info().acceptsRanges());
+        e.setSegments(parts.segments());
         e.setCreatedAt(Instant.now());
         e.setEncryptedCredentials(encryptCredentials(req));
-        e.setMirrors(joinMirrors(mirrors));
+        e.setEncryptedReferer(encryptHeader(req.referer()));
+        e.setEncryptedCookies(encryptHeader(req.cookies()));
+        e.setEncryptedUserAgent(encryptHeader(req.userAgent()));
+        e.setMirrors(joinMirrors(parts.mirrors()));
         e.setChecksumAlgo(ChecksumVerifier.normalize(req.checksumAlgo()));
         e.setChecksumExpected(blankToNull(req.checksumExpected()));
+        Files.createDirectories(parts.target().getParent());
         save(e);
         resume(id);
         return view(id);
+    }
+
+    public DownloadPreview preview(DownloadCreateRequest req) throws Exception {
+        PreviewParts parts = buildPreviewParts(req);
+        DownloadCreateRequest normalized = new DownloadCreateRequest(
+                parts.info().finalUrl(),
+                req.folder(),
+                parts.segments(),
+                req.username(),
+                req.password(),
+                req.mirrors(),
+                req.checksumAlgo(),
+                req.checksumExpected(),
+                req.referer(),
+                req.cookies(),
+                req.userAgent(),
+                parts.filename(),
+                parts.size(),
+                parts.info().acceptsRanges(),
+                Boolean.FALSE
+        );
+        return new DownloadPreview(UUID.randomUUID().toString(), "http", parts.filename(), hostLabel(parts.uri()),
+                parts.info().finalUrl(), parts.target().getParent().toString(), parts.size(),
+                parts.info().acceptsRanges(), parts.segments(), normalized, null);
     }
 
     public DownloadView pause(String id) {
@@ -195,7 +206,7 @@ public class DownloadService {
             password = parts.length > 1 ? parts[1].toCharArray() : null;
         }
         HttpClient client = HttpClientBuilder.build(settings.proxySettings(), username, password);
-        HttpProbe.Info info = HttpProbe.probe(client, uri);
+        HttpProbe.Info info = HttpProbe.probe(client, uri, headersFrom(e));
         e.setUrl(info.finalUrl());
         e.setSource(hostLabel(uri));
         e.setAcceptsRanges(info.acceptsRanges());
@@ -258,6 +269,7 @@ public class DownloadService {
             password = parts.length > 1 ? parts[1].toCharArray() : null;
         }
         HttpClient client = HttpClientBuilder.build(settings.proxySettings(), username, password);
+        HttpRequestHeaders requestHeaders = headersFrom(e);
         URI primary = URI.create(e.getUrl());
         Path target = targetPath(e);
         DownloadRunner job;
@@ -266,10 +278,11 @@ public class DownloadService {
             List<URI> mirrors = parseMirrorEntities(e.getMirrors(), primary);
             job = new MultiSegmentDownloader(e.getId(), client, primary, mirrors, target,
                     e.getSizeBytes(), segments, props.getBufferBytes(), props.getMinSplitBytes(),
-                    progressBus, rateLimiter);
+                    progressBus, rateLimiter, requestHeaders);
         } else {
             job = new HttpDownloadJob(e.getId(), client, primary, target,
-                    e.getSizeBytes(), e.isAcceptsRanges(), progressBus, rateLimiter, props.getBufferBytes());
+                    e.getSizeBytes(), e.isAcceptsRanges(), progressBus, rateLimiter, props.getBufferBytes(),
+                    requestHeaders);
         }
         active.put(e.getId(), job);
         executor.submit(() -> runJob(e.getId(), job));
@@ -390,9 +403,69 @@ public class DownloadService {
         return HttpClientBuilder.build(settings.proxySettings(), req.username(), password);
     }
 
+    private PreviewParts buildPreviewParts(DownloadCreateRequest req) throws Exception {
+        if (req == null || req.url() == null || req.url().isBlank()) {
+            throw new IllegalArgumentException("url is required");
+        }
+        URI uri = urlGuard.parseOrReject(req.url().trim());
+        List<URI> mirrors = parseMirrors(req.mirrors());
+        if (props.isDnsPrefetch()) {
+            List<URI> all = new ArrayList<>(mirrors);
+            all.add(uri);
+            ConnectionWarmer.prefetchDns(all);
+        }
+        HttpClient client = clientFor(req);
+        if (props.isTcpPrewarm()) {
+            List<URI> all = new ArrayList<>(mirrors);
+            all.add(uri);
+            ConnectionWarmer.prewarmTcp(client, all);
+        }
+        HttpRequestHeaders requestHeaders = headersFrom(req);
+        HttpProbe.Info info = shouldProbe(req)
+                ? HttpProbe.probe(client, uri, requestHeaders)
+                : infoFromRequest(req, uri);
+        String filename = sanitizeFilename(info.filename());
+        Path root = resolveRoot(req.folder());
+        Path target = targetFor(root, filename, hasCustomFolder(req.folder())).normalize();
+        ensureInside(root, target);
+        long size = Math.max(0L, info.contentLength());
+        int segments = normalizeSegments(req.segments(), info.acceptsRanges(), size);
+        return new PreviewParts(uri, mirrors, info, filename, target, size, segments);
+    }
+
+    private boolean shouldProbe(DownloadCreateRequest req) {
+        return !Boolean.FALSE.equals(req.probe());
+    }
+
+    private HttpProbe.Info infoFromRequest(DownloadCreateRequest req, URI uri) {
+        String filename = HttpRequestHeaders.clean(req.filename());
+        if (filename == null) filename = filenameFromUri(uri);
+        long size = req.sizeBytes() == null ? -1L : Math.max(-1L, req.sizeBytes());
+        boolean acceptsRanges = Boolean.TRUE.equals(req.acceptsRanges());
+        return new HttpProbe.Info(size, acceptsRanges, uri.toString(), filename, null);
+    }
+
+    private HttpRequestHeaders headersFrom(DownloadCreateRequest req) {
+        return new HttpRequestHeaders(req.referer(), req.cookies(), req.userAgent());
+    }
+
+    private HttpRequestHeaders headersFrom(DownloadEntity e) throws Exception {
+        return new HttpRequestHeaders(decryptHeader(e.getEncryptedReferer()),
+                decryptHeader(e.getEncryptedCookies()), decryptHeader(e.getEncryptedUserAgent()));
+    }
+
     private String encryptCredentials(DownloadCreateRequest req) throws Exception {
         if (req.username() == null || req.username().isBlank() || req.password() == null) return null;
         return vault.encrypt(req.username() + "\n" + req.password());
+    }
+
+    private String encryptHeader(String value) throws Exception {
+        String clean = HttpRequestHeaders.clean(value);
+        return clean == null ? null : vault.encrypt(clean);
+    }
+
+    private String decryptHeader(String value) throws Exception {
+        return value == null || value.isBlank() ? null : vault.decrypt(value);
     }
 
     private Path resolveRoot(String folder) throws Exception {
@@ -414,6 +487,14 @@ public class DownloadService {
 
     private Path targetPath(DownloadEntity e) {
         return Paths.get(e.getFolder()).resolve(e.getFilename()).normalize();
+    }
+
+    private Path targetFor(Path root, String filename, boolean customFolder) {
+        return customFolder ? root.resolve(filename) : categorizer.resolve(root, filename);
+    }
+
+    private boolean hasCustomFolder(String folder) {
+        return folder != null && !folder.isBlank();
     }
 
     private void ensureInside(Path root, Path target) {
@@ -468,6 +549,14 @@ public class DownloadService {
         return host == null || host.isBlank() ? uri.toString() : host;
     }
 
+    private String filenameFromUri(URI uri) {
+        String path = uri.getPath();
+        if (path == null || path.isBlank()) return "download.bin";
+        int slash = path.lastIndexOf('/');
+        String name = slash >= 0 ? path.substring(slash + 1) : path;
+        return name == null || name.isBlank() ? "download.bin" : name;
+    }
+
     private List<URI> parseMirrors(List<String> mirrors) {
         if (mirrors == null || mirrors.isEmpty()) return List.of();
         List<URI> result = new ArrayList<>();
@@ -497,4 +586,7 @@ public class DownloadService {
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
+
+    private record PreviewParts(URI uri, List<URI> mirrors, HttpProbe.Info info, String filename, Path target,
+                                long size, int segments) { }
 }

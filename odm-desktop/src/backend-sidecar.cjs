@@ -20,10 +20,26 @@ function resolveJavaBin() {
 }
 
 function resolveBackendJar() {
-  if (process.resourcesPath) {
-    return path.join(process.resourcesPath, 'backend', 'odm-backend.jar');
+  if (process.env.ODM_BACKEND_JAR && fs.existsSync(process.env.ODM_BACKEND_JAR)) {
+    return process.env.ODM_BACKEND_JAR;
   }
-  return path.resolve(__dirname, '..', '..', 'backend', 'build', 'libs', 'odm-backend-1.0.0.jar');
+  const candidates = [
+    process.resourcesPath && path.join(process.resourcesPath, 'backend', 'odm-backend.jar'),
+    process.resourcesPath && path.join(process.resourcesPath, 'backend', 'adm-backend.jar'),
+    path.resolve(__dirname, '..', '..', 'resources', 'backend', 'odm-backend.jar'),
+    path.resolve(__dirname, '..', '..', 'resources', 'backend', 'adm-backend.jar'),
+  ].filter(Boolean);
+  const libs = path.resolve(__dirname, '..', '..', 'backend', 'build', 'libs');
+  if (fs.existsSync(libs)) {
+    for (const file of fs.readdirSync(libs)) {
+      if (/odm-backend-.*\.jar$/.test(file) && !file.endsWith('-plain.jar')) {
+        candidates.push(path.join(libs, file));
+      }
+    }
+  }
+  const found = candidates.find((file) => fs.existsSync(file));
+  if (found) return found;
+  return path.resolve(__dirname, '..', '..', 'backend', 'build', 'libs', 'odm-backend.jar');
 }
 
 function startBackend() {
@@ -89,6 +105,9 @@ function stopBackend() {
 }
 
 function getBackendInfo() {
+  if (backendPort && backendToken) {
+    return { port: backendPort, token: backendToken, dev: process.env.ODM_DEV === '1' };
+  }
   if (process.env.ODM_DEV === '1') {
     return {
       port: Number(process.env.ODM_BACKEND_PORT ?? 0),

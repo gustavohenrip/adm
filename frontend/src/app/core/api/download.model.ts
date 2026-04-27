@@ -28,6 +28,13 @@ export interface DownloadCreateRequest {
   mirrors?: string[];
   checksumAlgo?: string;
   checksumExpected?: string;
+  referer?: string;
+  cookies?: string;
+  userAgent?: string;
+  filename?: string;
+  sizeBytes?: number;
+  acceptsRanges?: boolean;
+  probe?: boolean;
 }
 
 export interface BatchDownloadRequest {
@@ -44,6 +51,21 @@ export interface TorrentCreateRequest {
   torrentUrl?: string;
   torrentBase64?: string;
   folder?: string;
+  name?: string;
+}
+
+export interface DownloadPreview {
+  id: string;
+  kind: DownloadKind;
+  name: string;
+  source: string;
+  url: string;
+  folder: string;
+  sizeBytes: number;
+  acceptsRanges: boolean;
+  segments: number;
+  http?: DownloadCreateRequest;
+  torrent?: TorrentCreateRequest;
 }
 
 export interface ScheduleRule {

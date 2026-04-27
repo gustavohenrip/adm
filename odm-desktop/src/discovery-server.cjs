@@ -19,9 +19,22 @@ function buildResponse() {
   };
 }
 
+function allowedOrigin(origin) {
+  return !origin
+    || origin.startsWith('chrome-extension://')
+    || origin.startsWith('moz-extension://')
+    || origin.startsWith('http://127.0.0.1:')
+    || origin.startsWith('http://localhost:');
+}
+
 function handle(req, res) {
   const origin = req.headers.origin || '';
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (!allowedOrigin(origin)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  res.setHeader('Access-Control-Allow-Origin', origin || 'null');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Vary', 'Origin');

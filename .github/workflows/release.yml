@@ -16,7 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            target: exe
+          - os: ubuntu-latest
+            target: linux
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -29,65 +33,23 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
-      - name: Build backend jar
-        working-directory: backend
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            odm-desktop/package-lock.json
+      - name: Build installer
         shell: bash
-        run: |
-          chmod +x ./gradlew || true
-          ./gradlew --no-daemon bootJar -x test
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          npm install --no-audit --no-fund --ignore-scripts
-          npx ng build --configuration=production
-      - name: Stage artifacts
-        shell: bash
-        run: |
-          mkdir -p resources/backend resources/jdk odm-desktop/app
-          cp backend/build/libs/*.jar resources/backend/odm-backend.jar
-          cp -R "$JAVA_HOME"/. resources/jdk/
-          cp -R frontend/dist/frontend/browser/* odm-desktop/app/
-      - name: Verify packaged frontend
-        shell: bash
-        run: |
-          test -f odm-desktop/app/index.html
-          grep -q '<base href="./">' odm-desktop/app/index.html
+        run: node Build/build-app.mjs ${{ matrix.target }} --ci
       - name: Publish installer
-        working-directory: odm-desktop
         env:
-          ODM_RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         shell: bash
         run: |
-          npm install --no-audit --no-fund
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            missing=()
-            [[ -n "${CSC_LINK:-}" ]] || missing+=("MAC_CSC_LINK")
-            [[ -n "${CSC_KEY_PASSWORD:-}" ]] || missing+=("MAC_CSC_KEY_PASSWORD")
-            [[ -n "${APPLE_ID:-}" ]] || missing+=("APPLE_ID")
-            [[ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]] || missing+=("APPLE_APP_SPECIFIC_PASSWORD")
-            [[ -n "${APPLE_TEAM_ID:-}" ]] || missing+=("APPLE_TEAM_ID")
-            if (( ${#missing[@]} )); then
-              printf 'Missing macOS release secrets: %s\n' "${missing[*]}" >&2
-              exit 0
-            fi
-            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
-          else
-            GH_TOKEN= GITHUB_TOKEN= npx electron-builder --publish never
-          fi
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            codesign --verify --deep --strict --verbose=4 "dist/mac-arm64/ODM.app"
-          fi
-          export GH_TOKEN="$ODM_RELEASE_TOKEN"
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes "ODM desktop release." --latest || true
           else
             gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes "ODM desktop release." --latest
           fi
-          find dist -maxdepth 1 -type f \( -name 'ODM-*' -o -name 'latest*.yml' \) -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
+          find odm-desktop/dist -maxdepth 1 -type f \( -name '*.exe' -o -name '*.AppImage' -o -name '*.blockmap' -o -name 'latest*.yml' \) -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
           gh release edit "$RELEASE_TAG" --draft=false --latest

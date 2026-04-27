@@ -24,7 +24,7 @@ odm:
   downloads:
     root: ${user.home}/Downloads/ODM
     default-segments: 16
-    max-segments: 32
+    max-segments: 64
     buffer-bytes: 524288
     min-split-bytes: 65536
     dns-prefetch: true

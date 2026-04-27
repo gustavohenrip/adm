@@ -1,9 +1,10 @@
 const DEFAULTS = {
   enabled: true,
   showNotifications: true,
-  minSizeKB: 256,
+  minSizeKB: 0,
   extensions: [
     'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'tgz',
+    'torrent',
     'iso', 'dmg', 'pkg', 'exe', 'msi', 'deb', 'rpm', 'apk', 'appimage',
     'mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v', 'mpg',
     'mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac', 'wma', 'opus',

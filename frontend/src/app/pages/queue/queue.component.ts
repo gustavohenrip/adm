@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateModule } from '@ngx-translate/core';
 import { filter } from 'rxjs';
 
 import { GlassComponent } from '../../shared/components/glass/glass.component';
@@ -10,14 +10,13 @@ import { Download } from '../../core/api/download.model';
 import { formatBytes } from '../../shared/format/format';
 import { DownloadsService } from '../../core/api/downloads.service';
 import { DownloadStore } from '../../core/api/download-store.service';
-import { AddDownloadDialogComponent, AddDownloadResult } from '../../shared/components/add-download-dialog/add-download-dialog.component';
-import { IconComponent } from '../../shared/icons/icons.component';
+import { DownloadIntakeService } from '../../core/api/download-intake.service';
 
 @Component({
   selector: 'app-queue',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslateModule, GlassComponent, QueueRowComponent, AddDownloadDialogComponent, IconComponent],
+  imports: [FormsModule, TranslateModule, GlassComponent, QueueRowComponent],
   template: `
     <app-glass class="wrap" [radius]="18">
       <div class="panel">
@@ -28,16 +27,12 @@ import { IconComponent } from '../../shared/icons/icons.component';
             [(ngModel)]="url"
             placeholder="https://example.com/file.zip"
             autocomplete="off"
-            [disabled]="busy()"
+            [disabled]="intake.busy()"
           />
-          <button type="button" class="ghost" (click)="openDialog()" [title]="'addDialog.title' | translate">
-            <app-icon name="plus" [size]="13"></app-icon>
-            <span>{{ 'queue.advanced' | translate }}</span>
-          </button>
-          <button type="submit" [disabled]="busy() || !url.trim()">{{ 'actions.add' | translate }}</button>
+          <button type="submit" [disabled]="intake.busy() || !url.trim()">{{ 'actions.add' | translate }}</button>
         </form>
-        @if (error()) {
-          <div class="form-error" role="alert">{{ error() }}</div>
+        @if (error() || intake.error()) {
+          <div class="form-error" role="alert">{{ error() || intake.error() }}</div>
         }
 
         <div class="header">
@@ -71,13 +66,6 @@ import { IconComponent } from '../../shared/icons/icons.component';
         </div>
       </div>
     </app-glass>
-
-    <app-add-download-dialog
-      #dialog
-      [open]="dialogOpen()"
-      (submitted)="onAdvancedSubmit($event)"
-      (closed)="dialogOpen.set(false)"
-    ></app-add-download-dialog>
   `,
   styles: [`
     :host { display: flex; flex: 1; min-height: 0; }
@@ -92,7 +80,7 @@ import { IconComponent } from '../../shared/icons/icons.component';
     }
     .create {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       padding: 16px 18px;
       border-bottom: 1px solid var(--hairline);
@@ -122,19 +110,6 @@ import { IconComponent } from '../../shared/icons/icons.component';
       color: var(--text-inverse);
       font-weight: 600;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .create button.ghost {
-      background: var(--chip);
-      color: var(--text-dim);
-      border: 1px solid var(--chip-border);
-      font-weight: 550;
-    }
-    .create button.ghost:hover {
-      background: var(--glass-hi);
-      color: var(--text);
     }
     .create button:disabled {
       opacity: 0.45;
@@ -206,17 +181,13 @@ import { IconComponent } from '../../shared/icons/icons.component';
 export class QueueComponent implements OnInit {
   private readonly downloadsService = inject(DownloadsService);
   private readonly store = inject(DownloadStore);
+  protected readonly intake = inject(DownloadIntakeService);
   private readonly router = inject(Router);
-  private readonly translate = inject(TranslateService);
-
-  @ViewChild('dialog') dialog?: AddDownloadDialogComponent;
 
   readonly downloads = this.store.downloads;
   readonly scope = signal(this.scopeFromUrl(this.router.url));
   readonly visibleDownloads = computed(() => this.downloads().filter((download) => this.matchesScope(download)));
-  readonly busy = signal(false);
   readonly error = signal('');
-  readonly dialogOpen = signal(false);
   url = '';
 
   constructor() {
@@ -237,60 +208,9 @@ export class QueueComponent implements OnInit {
   addUrl(): void {
     const url = this.url.trim();
     if (!url) return;
-    this.busy.set(true);
     this.error.set('');
-    let request = this.downloadsService.create({ url });
-    if (url.toLowerCase().startsWith('magnet:')) {
-      request = this.downloadsService.addTorrent({ magnet: url });
-    } else if (this.isTorrentUrl(url)) {
-      request = this.downloadsService.addTorrent({ torrentUrl: url });
-    }
-    request.subscribe({
-      next: (download) => {
-        this.url = '';
-        this.mergeOne(download);
-        this.busy.set(false);
-      },
-      error: () => {
-        this.error.set(this.translate.instant('queue.addError'));
-        this.busy.set(false);
-      },
-    });
-  }
-
-  openDialog(): void {
-    this.dialog?.reset();
-    this.dialogOpen.set(true);
-  }
-
-  onAdvancedSubmit(result: AddDownloadResult): void {
-    this.busy.set(true);
-    this.error.set('');
-    if (result.mode === 'single' && result.single) {
-      this.downloadsService.create(result.single).subscribe({
-        next: (download) => {
-          this.mergeOne(download);
-          this.busy.set(false);
-          this.dialogOpen.set(false);
-        },
-        error: () => {
-          this.error.set(this.translate.instant('queue.addError'));
-          this.busy.set(false);
-        },
-      });
-    } else if (result.mode === 'batch' && result.batch) {
-      this.downloadsService.createBatch(result.batch).subscribe({
-        next: (downloads) => {
-          downloads.forEach((d) => this.mergeOne(d));
-          this.busy.set(false);
-          this.dialogOpen.set(false);
-        },
-        error: () => {
-          this.error.set(this.translate.instant('queue.addError'));
-          this.busy.set(false);
-        },
-      });
-    }
+    this.intake.openFromUrl(url);
+    this.url = '';
   }
 
   onPause(id: string): void {
@@ -338,9 +258,5 @@ export class QueueComponent implements OnInit {
   private scopeFromUrl(url: string): string {
     const path = url.split('?')[0].replace(/^\/+/, '');
     return path || 'queue';
-  }
-
-  private isTorrentUrl(url: string): boolean {
-    return /^https?:\/\//i.test(url) && /\.torrent(?:[?#].*)?$/i.test(url);
   }
 }

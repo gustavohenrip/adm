@@ -4,9 +4,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,6 +26,7 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Service;
 
 import com.opendownloader.odm.download.DownloadKind;
+import com.opendownloader.odm.download.DownloadPreview;
 import com.opendownloader.odm.download.DownloadSnapshot;
 import com.opendownloader.odm.download.DownloadStatus;
 import com.opendownloader.odm.download.DownloadView;
@@ -34,6 +37,7 @@ import com.opendownloader.odm.persistence.DownloadRepository;
 import com.opendownloader.odm.security.UrlGuard;
 import com.opendownloader.odm.settings.RuntimeSettings;
 import com.frostwire.jlibtorrent.TorrentHandle;
+import com.frostwire.jlibtorrent.TorrentInfo;
 import com.frostwire.jlibtorrent.TorrentStatus;
 
 @Service
@@ -78,18 +82,20 @@ public class TorrentDownloadService {
         if (req != null && req.magnet() != null && !req.magnet().isBlank()) {
             url = req.magnet().trim();
             key = torrents.addMagnet(url, folder);
-            name = "Magnet " + shortKey(key);
+            name = preferredName(req.name(), magnetDisplayName(url, key));
         } else if (req != null && req.torrentUrl() != null && !req.torrentUrl().isBlank()) {
             URI uri = urlGuard.parseOrReject(req.torrentUrl().trim());
             byte[] bytes = downloadTorrentFile(uri);
+            TorrentInfo info = new TorrentInfo(bytes);
             key = torrents.addTorrentFile(bytes, folder);
             url = uri.toString();
-            name = "Torrent " + shortKey(key);
+            name = preferredName(req.name(), torrentName(info, key));
         } else if (req != null && req.torrentBase64() != null && !req.torrentBase64().isBlank()) {
             byte[] bytes = Base64.getDecoder().decode(req.torrentBase64());
+            TorrentInfo info = new TorrentInfo(bytes);
             key = torrents.addTorrentFile(bytes, folder);
             url = "torrent:" + key;
-            name = "Torrent " + shortKey(key);
+            name = preferredName(req.name(), torrentName(info, key));
         } else {
             throw new IllegalArgumentException("magnet, torrentUrl or torrentBase64 required");
         }
@@ -112,6 +118,47 @@ public class TorrentDownloadService {
         save(e);
         publish(e, 0L, -1L);
         return DownloadView.from(e, 0L);
+    }
+
+    public DownloadPreview preview(TorrentCreateRequest req) throws Exception {
+        Path folder = resolveFolder(req == null ? null : req.folder());
+        String id = UUID.randomUUID().toString();
+        if (req != null && req.magnet() != null && !req.magnet().isBlank()) {
+            String magnet = req.magnet().trim();
+            String key = TorrentSession.magnetKey(magnet);
+            String name = magnetDisplayName(magnet, key);
+            long size = 0L;
+            if (name.equals("Magnet " + shortKey(key))) {
+                TorrentInfo info = torrents.fetchMagnetInfo(magnet, folder, 5);
+                if (info != null && info.isValid()) {
+                    key = info.infoHashV1().toHex();
+                    name = torrentName(info, key);
+                    size = Math.max(0L, info.totalSize());
+                }
+            }
+            TorrentCreateRequest normalized = new TorrentCreateRequest(magnet, null, null, req.folder(), name);
+            return new DownloadPreview(id, "torrent", name, key == null ? "magnet" : key, magnet,
+                    folder.toString(), size, false, 1, null, normalized);
+        }
+        if (req != null && req.torrentUrl() != null && !req.torrentUrl().isBlank()) {
+            URI uri = urlGuard.parseOrReject(req.torrentUrl().trim());
+            TorrentInfo info = new TorrentInfo(downloadTorrentFile(uri));
+            String key = info.infoHashV1().toHex();
+            String name = torrentName(info, key);
+            TorrentCreateRequest normalized = new TorrentCreateRequest(null, uri.toString(), null, req.folder(), name);
+            return new DownloadPreview(id, "torrent", name, key, uri.toString(), folder.toString(),
+                    Math.max(0L, info.totalSize()), false, 1, null, normalized);
+        }
+        if (req != null && req.torrentBase64() != null && !req.torrentBase64().isBlank()) {
+            byte[] bytes = Base64.getDecoder().decode(req.torrentBase64());
+            TorrentInfo info = new TorrentInfo(bytes);
+            String key = info.infoHashV1().toHex();
+            String name = torrentName(info, key);
+            TorrentCreateRequest normalized = new TorrentCreateRequest(null, null, req.torrentBase64(), req.folder(), name);
+            return new DownloadPreview(id, "torrent", name, key, "torrent:" + key, folder.toString(),
+                    Math.max(0L, info.totalSize()), false, 1, null, normalized);
+        }
+        throw new IllegalArgumentException("magnet, torrentUrl or torrentBase64 required");
     }
 
     public DownloadView pause(String id) {
@@ -190,6 +237,45 @@ public class TorrentDownloadService {
     private String shortKey(String key) {
         if (key == null || key.isBlank()) return "download";
         return key.length() <= 12 ? key : key.substring(0, 12);
+    }
+
+    private String magnetDisplayName(String magnet, String key) {
+        String dn = magnetParam(magnet, "dn");
+        if (dn != null && !dn.isBlank()) return sanitizeName(dn);
+        return "Magnet " + shortKey(key);
+    }
+
+    private String preferredName(String requested, String fallback) {
+        if (requested != null && !requested.isBlank()) return sanitizeName(requested);
+        return fallback;
+    }
+
+    private String torrentName(TorrentInfo info, String key) {
+        String name = info.name();
+        if (name != null && !name.isBlank()) return sanitizeName(name);
+        return "Torrent " + shortKey(key);
+    }
+
+    private String magnetParam(String magnet, String name) {
+        int q = magnet == null ? -1 : magnet.indexOf('?');
+        if (q < 0 || q == magnet.length() - 1) return null;
+        String prefix = name + "=";
+        for (String part : magnet.substring(q + 1).split("&")) {
+            if (!part.regionMatches(true, 0, prefix, 0, prefix.length())) continue;
+            try {
+                return URLDecoder.decode(part.substring(prefix.length()), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                return part.substring(prefix.length());
+            }
+        }
+        return null;
+    }
+
+    private String sanitizeName(String name) {
+        String value = name == null || name.isBlank() ? "torrent" : name.trim();
+        value = value.replace('\\', '_').replace('/', '_').replace(':', '_');
+        value = value.replaceAll("[\\x00-\\x1F\\x7F]", "_");
+        return value.length() > 180 ? value.substring(0, 180) : value;
     }
 
     private byte[] downloadTorrentFile(URI uri) throws Exception {

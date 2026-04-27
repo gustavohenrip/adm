@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.opendownloader.odm.download.DownloadCreateRequest;
 import com.opendownloader.odm.download.DownloadKind;
+import com.opendownloader.odm.download.DownloadPreview;
 import com.opendownloader.odm.download.DownloadService;
 import com.opendownloader.odm.download.DownloadView;
 import com.opendownloader.odm.download.batch.BatchDownloadRequest;
@@ -47,6 +48,11 @@ public class DownloadsController {
     @PostMapping
     public ResponseEntity<DownloadView> create(@RequestBody DownloadCreateRequest payload) throws Exception {
         return ResponseEntity.accepted().body(downloads.create(payload));
+    }
+
+    @PostMapping("/preview")
+    public ResponseEntity<DownloadPreview> preview(@RequestBody DownloadCreateRequest payload) throws Exception {
+        return ResponseEntity.ok(downloads.preview(payload));
     }
 
     @PostMapping("/batch")

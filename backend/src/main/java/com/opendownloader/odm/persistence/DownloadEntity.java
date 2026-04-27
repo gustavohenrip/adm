@@ -70,6 +70,15 @@ public class DownloadEntity {
     @Column(name = "encrypted_credentials", length = 2048)
     private String encryptedCredentials;
 
+    @Column(name = "encrypted_referer", length = 8192)
+    private String encryptedReferer;
+
+    @Column(name = "encrypted_cookies", length = 32768)
+    private String encryptedCookies;
+
+    @Column(name = "encrypted_user_agent", length = 4096)
+    private String encryptedUserAgent;
+
     @Column(name = "mirrors", length = 4096)
     private String mirrors;
 
@@ -116,6 +125,12 @@ public class DownloadEntity {
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public String getEncryptedCredentials() { return encryptedCredentials; }
     public void setEncryptedCredentials(String encryptedCredentials) { this.encryptedCredentials = encryptedCredentials; }
+    public String getEncryptedReferer() { return encryptedReferer; }
+    public void setEncryptedReferer(String encryptedReferer) { this.encryptedReferer = encryptedReferer; }
+    public String getEncryptedCookies() { return encryptedCookies; }
+    public void setEncryptedCookies(String encryptedCookies) { this.encryptedCookies = encryptedCookies; }
+    public String getEncryptedUserAgent() { return encryptedUserAgent; }
+    public void setEncryptedUserAgent(String encryptedUserAgent) { this.encryptedUserAgent = encryptedUserAgent; }
     public String getMirrors() { return mirrors; }
     public void setMirrors(String mirrors) { this.mirrors = mirrors; }
     public String getChecksumAlgo() { return checksumAlgo; }

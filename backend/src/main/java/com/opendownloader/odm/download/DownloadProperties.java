@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class DownloadProperties {
     private String root;
     private int defaultSegments = 16;
-    private int maxSegments = 32;
+    private int maxSegments = 64;
     private int bufferBytes = 524288;
     private long minSplitBytes = 65536L;
     private boolean dnsPrefetch = true;
@@ -34,8 +34,8 @@ public class DownloadProperties {
     public void setRetry(Retry retry) { this.retry = retry; }
 
     public static class Retry {
-        private int maxAttempts = 5;
-        private long initialDelayMs = 500;
+        private int maxAttempts = 8;
+        private long initialDelayMs = 400;
         private long maxDelayMs = 30000;
 
         public int getMaxAttempts() { return maxAttempts; }

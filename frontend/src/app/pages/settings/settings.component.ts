@@ -61,11 +61,11 @@ interface SettingsState {
           </div>
           <div class="row">
             <label>{{ 'settings.defaultSegments' | translate }}</label>
-            <input type="number" min="1" max="32" [(ngModel)]="state.defaultSegments" />
+            <input type="number" min="1" max="64" [(ngModel)]="state.defaultSegments" />
           </div>
           <div class="row">
             <label>Max segments</label>
-            <input type="number" min="1" max="32" [(ngModel)]="state.maxSegments" />
+            <input type="number" min="1" max="64" [(ngModel)]="state.maxSegments" />
           </div>
           <div class="row">
             <label>{{ 'settings.rateLimit' | translate }}</label>
@@ -235,8 +235,8 @@ export class SettingsComponent implements OnInit {
 
   state: SettingsState = {
     downloadRoot: '~/Downloads/ODM',
-    defaultSegments: 8,
-    maxSegments: 16,
+    defaultSegments: 16,
+    maxSegments: 64,
     rateLimitKbps: 0,
     proxyKind: 'NONE',
     proxyHost: '',

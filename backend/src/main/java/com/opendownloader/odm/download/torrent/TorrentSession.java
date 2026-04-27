@@ -40,6 +40,7 @@ public class TorrentSession {
     private final TorrentProperties props;
     private SessionManager manager;
     private final ConcurrentMap<String, String> handleIds = new ConcurrentHashMap<>();
+    private volatile long downloadRateLimitBps = 0L;
 
     public TorrentSession(TorrentProperties props) {
         this.props = props;
@@ -65,6 +66,24 @@ public class TorrentSession {
             SettingsPack pack = new SettingsPack();
             pack.setEnableDht(props.isDhtEnabled());
             pack.setEnableLsd(props.isLsdEnabled());
+            pack.downloadRateLimit(toIntLimit(downloadRateLimitBps));
+            pack.uploadRateLimit(0);
+            pack.connectionsLimit(1500);
+            pack.maxPeerlistSize(8000);
+            pack.activeDownloads(50);
+            pack.activeSeeds(50);
+            pack.activeLimit(200);
+            pack.activeChecking(8);
+            pack.activeDhtLimit(300);
+            pack.activeTrackerLimit(500);
+            pack.activeLsdLimit(100);
+            pack.alertQueueSize(10000);
+            pack.maxQueuedDiskBytes(64 * 1024 * 1024);
+            pack.sendBufferWatermark(1024 * 1024);
+            pack.tickInterval(100);
+            pack.inactivityTimeout(600);
+            pack.seedingOutgoingConnections(true);
+            pack.setDhtBootstrapNodes("router.bittorrent.com:6881,router.utorrent.com:6881,dht.transmissionbt.com:6881,dht.libtorrent.org:25401");
             if (props.getListenPort() > 0) {
                 pack.setString(
                     com.frostwire.jlibtorrent.swig.settings_pack.string_types.listen_interfaces.swigValue(),
@@ -125,6 +144,21 @@ public class TorrentSession {
     public void resume(String infoHash) {
         TorrentHandle h = findHandle(infoHash);
         if (h != null) h.resume();
+    }
+
+    public TorrentInfo fetchMagnetInfo(String magnet, Path savePath, int timeoutSeconds) {
+        if (manager == null || magnet == null || magnet.isBlank()) return null;
+        try {
+            byte[] bytes = manager.fetchMagnet(magnet, Math.max(1, timeoutSeconds), savePath.toFile());
+            return bytes == null || bytes.length == 0 ? null : new TorrentInfo(bytes);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public synchronized void applyDownloadRateLimit(long bytesPerSecond) {
+        downloadRateLimitBps = Math.max(0L, bytesPerSecond);
+        if (manager != null) manager.downloadRateLimit(toIntLimit(downloadRateLimitBps));
     }
 
     public void remove(String infoHash, boolean deleteFiles) {
@@ -188,5 +222,10 @@ public class TorrentSession {
 
     public static String toBase64(byte[] bytes) {
         return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    private int toIntLimit(long bytesPerSecond) {
+        if (bytesPerSecond <= 0L) return 0;
+        return (int) Math.min(Integer.MAX_VALUE, bytesPerSecond);
     }
 }

@@ -7,6 +7,7 @@ import {
   BatchDownloadRequest,
   Download,
   DownloadCreateRequest,
+  DownloadPreview,
   ScheduleRule,
   TorrentCreateRequest,
 } from './download.model';
@@ -22,6 +23,10 @@ export class DownloadsService {
 
   create(req: DownloadCreateRequest): Observable<Download> {
     return this.http.post<Download>(`${this.base}/api/downloads`, req, { headers: this.headers });
+  }
+
+  preview(req: DownloadCreateRequest): Observable<DownloadPreview> {
+    return this.http.post<DownloadPreview>(`${this.base}/api/downloads/preview`, req, { headers: this.headers });
   }
 
   createBatch(req: BatchDownloadRequest): Observable<Download[]> {
@@ -54,6 +59,14 @@ export class DownloadsService {
 
   addTorrent(req: TorrentCreateRequest): Observable<Download> {
     return this.http.post<Download>(`${this.base}/api/torrents`, req, { headers: this.headers });
+  }
+
+  previewTorrent(req: TorrentCreateRequest): Observable<DownloadPreview> {
+    return this.http.post<DownloadPreview>(`${this.base}/api/torrents/preview`, req, { headers: this.headers });
+  }
+
+  pendingIntakes(): Observable<DownloadPreview[]> {
+    return this.http.get<DownloadPreview[]>(`${this.base}/api/intake`, { headers: this.headers });
   }
 
   scheduleRules(): Observable<ScheduleRule[]> {

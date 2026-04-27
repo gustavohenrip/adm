@@ -12,7 +12,7 @@ function start(onUrl) {
       if (current === lastSeen) return;
       lastSeen = current;
       const trimmed = current.trim();
-      if (trimmed.length < 4 || trimmed.length > 4096) return;
+      if (trimmed.length < 4 || trimmed.length > 32768) return;
       if (!URL_REGEX.test(trimmed)) return;
       onUrl(trimmed);
     } catch {}

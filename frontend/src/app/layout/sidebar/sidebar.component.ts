@@ -59,12 +59,6 @@ export interface SidebarNavItem {
               <span class="num">{{ sessionSpeed | number: '1.1-1' }}</span>
               <span class="unit">MB/s</span>
             </div>
-            <div class="session-bar">
-              <div class="session-fill" [style.width.%]="sessionPct"></div>
-            </div>
-            <div class="session-foot">
-              <span>{{ sessionPct | number: '1.0-0' }}% of {{ sessionCap | number: '1.0-0' }} MB/s cap</span>
-            </div>
           </div>
         }
 
@@ -217,26 +211,6 @@ export interface SidebarNavItem {
       font-size: 11.5px;
       color: var(--text-dim);
     }
-    .session-bar {
-      margin-top: 10px;
-      height: 2px;
-      border-radius: 1px;
-      background: var(--track);
-      overflow: hidden;
-    }
-    .session-fill {
-      height: 100%;
-      background: var(--fill);
-      border-radius: 1px;
-      transition: width .3s ease;
-    }
-    .session-foot {
-      margin-top: 8px;
-      font-size: 10.5px;
-      color: var(--text-subtle);
-      font-family: var(--font-mono);
-    }
-
     .user {
       display: flex;
       align-items: center;
@@ -317,16 +291,10 @@ export class SidebarComponent {
     { key: 'failed', labelKey: 'nav.failed', count: 0, path: '/failed' },
   ];
   @Input() sessionSpeed: number | null = null;
-  @Input() sessionCap = 80;
   @Input() userName = 'Local User';
   @Input() userInitials = 'U';
   @Input() storageFree = '—';
 
   @Output() newDownload = new EventEmitter<void>();
   @Output() settings = new EventEmitter<void>();
-
-  get sessionPct(): number {
-    if (this.sessionSpeed === null || this.sessionCap <= 0) return 0;
-    return Math.round(Math.min(100, (this.sessionSpeed / this.sessionCap) * 100));
-  }
 }

@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "description": "Captures downloads from Chrome and routes them to the ODM desktop app, IDM-style.",
   "minimum_chrome_version": "108",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsLFUQOsueglFJpWC1BxarkmA714KjiRTigj1/ny5P0fLH1JOYepOrLVEwBd+Kjg8BMnij0QXMIkkszKjz3SlCF1KS+XixHjh5SPEcg7a+eceUXrqsO0c35kWAIqZ5dz5jNAqDesNfYBIRuOJ3FdgiGQp7peG3ZFnLGsaWflq+Hld8UoeXD+FcJwl2DPR5Sfv74R97kCzL7jGG5g1+PzCEhTPGB+niAoLifdIlDb75vq2DyKMxlebHVAl4KyWks49aZDHqlcbJvffaav3LvEC2jwjc2wxVTNKaH3fWczaVeQFUruYGkbHwmkreiXXbJfDMUPCat/V8xgUXorhsn6OlQIDAQAB",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",
@@ -28,15 +29,31 @@
   "options_page": "options.html",
   "permissions": [
     "downloads",
+    "webRequest",
     "storage",
     "contextMenus",
     "cookies",
     "notifications",
-    "activeTab"
+    "nativeMessaging",
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>",
     "http://127.0.0.1/*",
     "http://localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
   ]
 }

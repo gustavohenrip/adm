@@ -34,12 +34,14 @@ public final class RangeWorker implements Runnable {
     private final int bufferSize;
     private final java.util.List<URI> mirrors;
     private final java.util.concurrent.atomic.AtomicInteger mirrorCursor;
+    private final HttpRequestHeaders headers;
 
     public RangeWorker(String downloadId, HttpClient client, URI uri, Path target,
                        SegmentManager manager, ProgressBus progressBus,
                        AtomicBoolean stopFlag, RateLimiter rateLimiter) {
         this(downloadId, client, uri, target, manager, progressBus, stopFlag, rateLimiter,
-                DEFAULT_BUFFER_SIZE, java.util.List.of(uri), new java.util.concurrent.atomic.AtomicInteger());
+                DEFAULT_BUFFER_SIZE, java.util.List.of(uri), new java.util.concurrent.atomic.AtomicInteger(),
+                HttpRequestHeaders.emptyHeaders());
     }
 
     public RangeWorker(String downloadId, HttpClient client, URI uri, Path target,
@@ -47,6 +49,16 @@ public final class RangeWorker implements Runnable {
                        AtomicBoolean stopFlag, RateLimiter rateLimiter,
                        int bufferSize, java.util.List<URI> mirrors,
                        java.util.concurrent.atomic.AtomicInteger mirrorCursor) {
+        this(downloadId, client, uri, target, manager, progressBus, stopFlag, rateLimiter,
+                bufferSize, mirrors, mirrorCursor, HttpRequestHeaders.emptyHeaders());
+    }
+
+    public RangeWorker(String downloadId, HttpClient client, URI uri, Path target,
+                       SegmentManager manager, ProgressBus progressBus,
+                       AtomicBoolean stopFlag, RateLimiter rateLimiter,
+                       int bufferSize, java.util.List<URI> mirrors,
+                       java.util.concurrent.atomic.AtomicInteger mirrorCursor,
+                       HttpRequestHeaders headers) {
         this.downloadId = downloadId;
         this.client = client;
         this.uri = uri;
@@ -58,6 +70,7 @@ public final class RangeWorker implements Runnable {
         this.bufferSize = Math.max(8 * 1024, bufferSize);
         this.mirrors = mirrors == null || mirrors.isEmpty() ? java.util.List.of(uri) : mirrors;
         this.mirrorCursor = mirrorCursor == null ? new java.util.concurrent.atomic.AtomicInteger() : mirrorCursor;
+        this.headers = headers == null ? HttpRequestHeaders.emptyHeaders() : headers;
     }
 
     @Override
@@ -87,13 +100,13 @@ public final class RangeWorker implements Runnable {
             return;
         }
         URI source = pickMirror();
-        HttpRequest req = HttpRequest.newBuilder(source)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(source)
                 .GET()
                 .timeout(Duration.ofMinutes(10))
-                .header("Range", "bytes=" + start + "-" + end)
-                .build();
+                .header("Range", "bytes=" + start + "-" + end);
+        headers.apply(builder);
 
-        HttpResponse<InputStream> res = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> res = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
         if (res.statusCode() != 206 && res.statusCode() / 100 != 2) {
             throw new RuntimeException("HTTP " + res.statusCode() + " on range " + start + "-" + end);
         }

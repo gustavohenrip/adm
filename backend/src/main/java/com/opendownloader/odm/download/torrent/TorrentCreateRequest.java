@@ -4,6 +4,7 @@ public record TorrentCreateRequest(
         String magnet,
         String torrentUrl,
         String torrentBase64,
-        String folder
+        String folder,
+        String name
 ) {
 }

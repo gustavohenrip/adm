@@ -1,6 +1,6 @@
 {
   "name": "odm-desktop",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "ODM — Open Downloader Manager desktop shell",
   "main": "src/main.cjs",
   "private": true,
@@ -66,7 +66,18 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "ODM",
+            "CFBundleURLSchemes": [
+              "odm",
+              "magnet"
+            ]
+          }
+        ]
+      }
     },
     "win": {
       "icon": "build/icon.png",

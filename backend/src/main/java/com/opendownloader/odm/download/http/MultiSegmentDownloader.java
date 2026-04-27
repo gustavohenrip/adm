@@ -35,17 +35,25 @@ public final class MultiSegmentDownloader implements DownloadRunner {
     private final long minSplitBytes;
     private final ProgressBus progressBus;
     private final RateLimiter rateLimiter;
+    private final HttpRequestHeaders headers;
     private final AtomicBoolean stopFlag = new AtomicBoolean(false);
 
     public MultiSegmentDownloader(String id, HttpClient client, URI uri, Path target,
                                   long totalSize, int segmentCount, ProgressBus bus, RateLimiter limiter) {
         this(id, client, uri, List.of(uri), target, totalSize, segmentCount,
-                DEFAULT_BUFFER_SIZE, DEFAULT_MIN_SPLIT, bus, limiter);
+                DEFAULT_BUFFER_SIZE, DEFAULT_MIN_SPLIT, bus, limiter, HttpRequestHeaders.emptyHeaders());
     }
 
     public MultiSegmentDownloader(String id, HttpClient client, URI uri, List<URI> mirrors, Path target,
                                   long totalSize, int segmentCount, int bufferSize, long minSplitBytes,
                                   ProgressBus bus, RateLimiter limiter) {
+        this(id, client, uri, mirrors, target, totalSize, segmentCount, bufferSize, minSplitBytes, bus, limiter,
+                HttpRequestHeaders.emptyHeaders());
+    }
+
+    public MultiSegmentDownloader(String id, HttpClient client, URI uri, List<URI> mirrors, Path target,
+                                  long totalSize, int segmentCount, int bufferSize, long minSplitBytes,
+                                  ProgressBus bus, RateLimiter limiter, HttpRequestHeaders headers) {
         this.id = id;
         this.client = client;
         this.uri = uri;
@@ -57,6 +65,7 @@ public final class MultiSegmentDownloader implements DownloadRunner {
         this.minSplitBytes = Math.max(4 * 1024L, minSplitBytes);
         this.progressBus = bus;
         this.rateLimiter = limiter;
+        this.headers = headers == null ? HttpRequestHeaders.emptyHeaders() : headers;
     }
 
     public void stop() { stopFlag.set(true); }
@@ -74,7 +83,7 @@ public final class MultiSegmentDownloader implements DownloadRunner {
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (Segment seg : initial) {
             RangeWorker worker = new RangeWorker(id, client, uri, target, manager, progressBus,
-                    stopFlag, rateLimiter, bufferSize, mirrors, mirrorCursor);
+                    stopFlag, rateLimiter, bufferSize, mirrors, mirrorCursor, headers);
             CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
                 try {
                     worker.processAssigned(seg);
