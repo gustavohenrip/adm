@@ -15,7 +15,7 @@ spring:
         dialect: org.hibernate.community.dialect.SQLiteDialect
         show_sql: false
   datasource:
-    url: jdbc:sqlite:${user.home}/.odm/odm.sqlite
+    url: jdbc:sqlite:${user.home}/.odm/odm.sqlite?busy_timeout=10000&journal_mode=WAL
     driver-class-name: org.sqlite.JDBC
   quartz:
     job-store-type: memory

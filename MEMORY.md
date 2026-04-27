@@ -12,3 +12,6 @@
 - 2026-04-27: Magnet pode chegar ao app por extensao e protocolo ao mesmo tempo. Deduplicar por hash/URL, nao por ID de preview.
 - 2026-04-27: Ao pedir "substituir arquivo", confirmar no app e tambem enviar flag ao backend para apagar o destino. So perguntar sem mudar o backend vira resume parcial.
 - 2026-04-27: Nao encadear comandos com `&&` em shell nesta repo; usar execucoes separadas para manter saida limpa e seguir o padrao pedido.
+- 2026-04-27: Em downloads longos, `stop()` nao pode apenas setar flag; precisa interromper thread e fechar stream/conexao ativa para delete/pause nao ficarem travados.
+- 2026-04-27: Se `package.json` ja foi alterado manualmente, nao rodar `npm version` para sincronizar lockfile; usar `npm install --package-lock-only`.
+- 2026-04-27: Monitores periodicos nao podem salvar entidades carregadas antes de um delete; isso pode recriar download removido. Salvar progresso somente se o registro ainda existir sob o mesmo lock.

@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -30,11 +31,13 @@ import com.opendownloader.odm.download.http.HttpDownloadJob;
 import com.opendownloader.odm.download.http.HttpProbe;
 import com.opendownloader.odm.download.http.HttpRequestHeaders;
 import com.opendownloader.odm.download.http.MultiSegmentDownloader;
+import com.opendownloader.odm.download.http.RangeNotSupportedException;
 import com.opendownloader.odm.download.queue.RateLimiter;
 import com.opendownloader.odm.download.queue.RetryPolicy;
 import com.opendownloader.odm.fs.FileCategorizer;
 import com.opendownloader.odm.persistence.DownloadEntity;
 import com.opendownloader.odm.persistence.DownloadRepository;
+import com.opendownloader.odm.persistence.PersistenceGate;
 import com.opendownloader.odm.security.CredentialVault;
 import com.opendownloader.odm.persistence.ScheduleRuleEntity;
 import com.opendownloader.odm.persistence.ScheduleRuleRepository;
@@ -56,15 +59,17 @@ public class DownloadService {
     private final RateLimiter rateLimiter;
     private final ScheduleRuleRepository scheduleRules;
     private final SystemEventsBroadcaster systemEvents;
+    private final PersistenceGate persistenceGate;
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor();
     private final Map<String, DownloadRunner> active = new ConcurrentHashMap<>();
-    private final Object writeLock = new Object();
+    private final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
 
     public DownloadService(DownloadRepository repo, FileCategorizer categorizer, UrlGuard urlGuard,
                            ProgressBus progressBus, DownloadProperties props, CredentialVault vault,
                            RuntimeSettings settings, RateLimiter rateLimiter,
-                           ScheduleRuleRepository scheduleRules, SystemEventsBroadcaster systemEvents) {
+                           ScheduleRuleRepository scheduleRules, SystemEventsBroadcaster systemEvents,
+                           PersistenceGate persistenceGate) {
         this.repo = repo;
         this.categorizer = categorizer;
         this.urlGuard = urlGuard;
@@ -75,6 +80,7 @@ public class DownloadService {
         this.rateLimiter = rateLimiter;
         this.scheduleRules = scheduleRules;
         this.systemEvents = systemEvents;
+        this.persistenceGate = persistenceGate;
     }
 
     @PostConstruct
@@ -173,8 +179,7 @@ public class DownloadService {
     }
 
     public DownloadView pause(String id) {
-        DownloadRunner job = active.remove(id);
-        if (job != null) job.stop();
+        stopActive(id);
         DownloadEntity e = find(id);
         if (e.getStatus() == DownloadStatus.DOWNLOADING || e.getStatus() == DownloadStatus.QUEUED) {
             e.setDownloadedBytes(progressBus.downloaded(id));
@@ -201,8 +206,7 @@ public class DownloadService {
         if (newUrl == null || newUrl.isBlank()) throw new IllegalArgumentException("newUrl is required");
         URI uri = urlGuard.parseOrReject(newUrl.trim());
         DownloadEntity e = find(id);
-        DownloadRunner job = active.remove(id);
-        if (job != null) job.stop();
+        stopActive(id);
         char[] password = null;
         String username = null;
         if (e.getEncryptedCredentials() != null && !e.getEncryptedCredentials().isBlank()) {
@@ -225,12 +229,16 @@ public class DownloadService {
     }
 
     public void remove(String id, boolean deleteFiles) throws Exception {
-        DownloadRunner job = active.remove(id);
-        if (job != null) job.stop();
+        stopActive(id);
         DownloadEntity e = find(id);
         delete(id);
         progressBus.reset(id);
-        if (deleteFiles) Files.deleteIfExists(targetPath(e));
+        if (deleteFiles) {
+            try {
+                Files.deleteIfExists(targetPath(e));
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public DownloadView view(String id) {
@@ -290,7 +298,8 @@ public class DownloadService {
                     requestHeaders);
         }
         active.put(e.getId(), job);
-        executor.submit(() -> runJob(e.getId(), job));
+        Future<?> task = executor.submit(() -> runJob(e.getId(), job));
+        runningTasks.put(e.getId(), task);
     }
 
     private void runJob(String id, DownloadRunner job) {
@@ -298,19 +307,64 @@ public class DownloadService {
             markStatus(id, DownloadStatus.DOWNLOADING, null);
             RetryPolicy retry = new RetryPolicy(props.getRetry().getMaxAttempts(),
                     props.getRetry().getInitialDelayMs(), props.getRetry().getMaxDelayMs());
-            retry.execute(() -> {
+            if (job instanceof MultiSegmentDownloader) {
                 job.run();
-                return null;
-            });
+            } else {
+                retry.execute(() -> {
+                    job.run();
+                    return null;
+                });
+            }
             if (active.remove(id, job)) markComplete(id);
+        } catch (RangeNotSupportedException e) {
+            if (active.remove(id, job)) restartWithoutRanges(id);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            active.remove(id, job);
-            markStatus(id, DownloadStatus.PAUSED, null);
+            if (active.remove(id, job)) markStatus(id, DownloadStatus.PAUSED, null);
         } catch (Exception e) {
-            active.remove(id, job);
-            markStatus(id, DownloadStatus.FAILED, e.getMessage());
+            if (isRangeNotSupported(e) && active.remove(id, job)) {
+                restartWithoutRanges(id);
+                return;
+            }
+            if (active.remove(id, job)) markStatus(id, DownloadStatus.FAILED, e.getMessage());
+        } finally {
+            runningTasks.remove(id);
         }
+    }
+
+    private void stopActive(String id) {
+        DownloadRunner job = active.remove(id);
+        if (job != null) job.stop();
+        Future<?> task = runningTasks.remove(id);
+        if (task != null) task.cancel(true);
+    }
+
+    private boolean isRangeNotSupported(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof RangeNotSupportedException) return true;
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void restartWithoutRanges(String id) {
+        repo.findById(id).ifPresent(e -> {
+            try {
+                progressBus.reset(id);
+                Files.deleteIfExists(targetPath(e));
+                e.setDownloadedBytes(0L);
+                e.setAcceptsRanges(false);
+                e.setSegments(1);
+                e.setStatus(DownloadStatus.QUEUED);
+                e.setErrorMessage(null);
+                save(e);
+                publish(e);
+                startJob(e);
+            } catch (Exception ex) {
+                markStatus(id, DownloadStatus.FAILED, ex.getMessage());
+            }
+        });
     }
 
     private void flushProgress() {
@@ -318,8 +372,8 @@ public class DownloadService {
             for (String id : active.keySet()) {
                 repo.findById(id).ifPresent(e -> {
                     e.setDownloadedBytes(Math.max(e.getDownloadedBytes(), progressBus.downloaded(id)));
-                    save(e);
-                    publish(e);
+                    DownloadEntity saved = saveIfPresent(e);
+                    if (saved != null) publish(saved);
                 });
             }
         } catch (Exception ignored) {
@@ -381,15 +435,15 @@ public class DownloadService {
     }
 
     private DownloadEntity save(DownloadEntity e) {
-        synchronized (writeLock) {
-            return repo.saveAndFlush(e);
-        }
+        return persistenceGate.write(() -> repo.saveAndFlush(e));
+    }
+
+    private DownloadEntity saveIfPresent(DownloadEntity e) {
+        return persistenceGate.write(() -> repo.existsById(e.getId()) ? repo.saveAndFlush(e) : null);
     }
 
     private void delete(String id) {
-        synchronized (writeLock) {
-            repo.deleteById(id);
-        }
+        persistenceGate.write(() -> repo.deleteById(id));
     }
 
     private void publish(DownloadEntity e) {

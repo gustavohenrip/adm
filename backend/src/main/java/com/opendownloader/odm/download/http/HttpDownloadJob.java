@@ -35,6 +35,8 @@ public final class HttpDownloadJob implements DownloadRunner {
     private final int bufferSize;
     private final HttpRequestHeaders headers;
     private final AtomicBoolean stopFlag = new AtomicBoolean(false);
+    private volatile InputStream currentBody;
+    private volatile Thread runningThread;
 
     public HttpDownloadJob(String id, HttpClient client, URI uri, Path target,
                            long totalSize, boolean acceptsRanges, ProgressBus bus, RateLimiter rateLimiter) {
@@ -66,9 +68,28 @@ public final class HttpDownloadJob implements DownloadRunner {
 
     public void stop() {
         stopFlag.set(true);
+        Thread thread = runningThread;
+        if (thread != null) thread.interrupt();
+        InputStream body = currentBody;
+        if (body != null) {
+            try {
+                body.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     public void run() throws Exception {
+        runningThread = Thread.currentThread();
+        try {
+            runInternal();
+        } finally {
+            currentBody = null;
+            runningThread = null;
+        }
+    }
+
+    private void runInternal() throws Exception {
         long existing = resumeOffset();
         if (existing > 0 && !acceptsRanges) {
             existing = 0;
@@ -85,6 +106,8 @@ public final class HttpDownloadJob implements DownloadRunner {
             builder.header("Range", "bytes=" + existing + "-");
         }
 
+        if (stopFlag.get()) return;
+
         HttpResponse<InputStream> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
         int status = response.statusCode();
         if (status / 100 != 2) {
@@ -95,8 +118,9 @@ public final class HttpDownloadJob implements DownloadRunner {
         }
 
         progressBus.seed(id, existing);
+        currentBody = response.body();
 
-        try (InputStream in = response.body();
+        try (InputStream in = currentBody;
              FileChannel channel = FileChannel.open(target,
                      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ)) {
             channel.truncate(existing);

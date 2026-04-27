@@ -35,6 +35,7 @@ import com.opendownloader.odm.download.ProgressBus;
 import com.opendownloader.odm.download.http.HttpClientBuilder;
 import com.opendownloader.odm.persistence.DownloadEntity;
 import com.opendownloader.odm.persistence.DownloadRepository;
+import com.opendownloader.odm.persistence.PersistenceGate;
 import com.opendownloader.odm.security.UrlGuard;
 import com.opendownloader.odm.settings.RuntimeSettings;
 import com.frostwire.jlibtorrent.TorrentHandle;
@@ -51,16 +52,17 @@ public class TorrentDownloadService {
     private final ProgressBus progressBus;
     private final RuntimeSettings settings;
     private final UrlGuard urlGuard;
+    private final PersistenceGate persistenceGate;
     private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor();
-    private final Object writeLock = new Object();
 
     public TorrentDownloadService(TorrentSession torrents, DownloadRepository repo, ProgressBus progressBus,
-                                  RuntimeSettings settings, UrlGuard urlGuard) {
+                                  RuntimeSettings settings, UrlGuard urlGuard, PersistenceGate persistenceGate) {
         this.torrents = torrents;
         this.repo = repo;
         this.progressBus = progressBus;
         this.settings = settings;
         this.urlGuard = urlGuard;
+        this.persistenceGate = persistenceGate;
     }
 
     @PostConstruct
@@ -227,9 +229,10 @@ public class TorrentDownloadService {
                 } else if (e.getStatus() != DownloadStatus.PAUSED) {
                     e.setStatus(DownloadStatus.DOWNLOADING);
                 }
-                save(e);
+                DownloadEntity saved = saveIfPresent(e);
+                if (saved == null) continue;
                 long eta = speed > 0 ? Math.max(0L, total - done) / speed : -1L;
-                publish(e, speed, eta);
+                publish(saved, speed, eta);
             }
         } catch (Exception ignored) {
         }
@@ -376,15 +379,15 @@ public class TorrentDownloadService {
     }
 
     private DownloadEntity save(DownloadEntity e) {
-        synchronized (writeLock) {
-            return repo.saveAndFlush(e);
-        }
+        return persistenceGate.write(() -> repo.saveAndFlush(e));
+    }
+
+    private DownloadEntity saveIfPresent(DownloadEntity e) {
+        return persistenceGate.write(() -> repo.existsById(e.getId()) ? repo.saveAndFlush(e) : null);
     }
 
     private void delete(String id) {
-        synchronized (writeLock) {
-            repo.deleteById(id);
-        }
+        persistenceGate.write(() -> repo.deleteById(id));
     }
 
     private void publish(DownloadEntity e, long speed, long eta) {

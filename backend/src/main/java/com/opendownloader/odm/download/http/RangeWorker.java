@@ -35,6 +35,8 @@ public final class RangeWorker implements Runnable {
     private final java.util.List<URI> mirrors;
     private final java.util.concurrent.atomic.AtomicInteger mirrorCursor;
     private final HttpRequestHeaders headers;
+    private volatile InputStream currentBody;
+    private volatile Thread runningThread;
 
     public RangeWorker(String downloadId, HttpClient client, URI uri, Path target,
                        SegmentManager manager, ProgressBus progressBus,
@@ -89,10 +91,33 @@ public final class RangeWorker implements Runnable {
     }
 
     public void processAssigned(Segment seg) throws Exception {
-        processSegment(seg);
+        runningThread = Thread.currentThread();
+        try {
+            processSegment(seg);
+        } finally {
+            currentBody = null;
+            runningThread = null;
+        }
+    }
+
+    public void stop() {
+        Thread thread = runningThread;
+        if (thread != null) thread.interrupt();
+        InputStream body = currentBody;
+        if (body != null) {
+            try {
+                body.close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void processSegment(Segment seg) throws Exception {
+        if (stopFlag.get()) return;
+        processSegmentInternal(seg);
+    }
+
+    private void processSegmentInternal(Segment seg) throws Exception {
         long start = seg.cursor();
         long end = seg.end();
         if (start > end) {
@@ -107,11 +132,15 @@ public final class RangeWorker implements Runnable {
         headers.apply(builder);
 
         HttpResponse<InputStream> res = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
-        if (res.statusCode() != 206 && res.statusCode() / 100 != 2) {
+        if (res.statusCode() == 200) {
+            throw new RangeNotSupportedException("server ignored range request");
+        }
+        if (res.statusCode() != 206) {
             throw new RuntimeException("HTTP " + res.statusCode() + " on range " + start + "-" + end);
         }
+        currentBody = res.body();
 
-        try (InputStream in = res.body();
+        try (InputStream in = currentBody;
              FileChannel ch = FileChannel.open(target,
                      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ)) {
             byte[] buf = new byte[bufferSize];

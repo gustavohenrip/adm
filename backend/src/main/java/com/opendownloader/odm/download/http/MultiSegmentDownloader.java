@@ -6,10 +6,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,10 @@ public final class MultiSegmentDownloader implements DownloadRunner {
     private final RateLimiter rateLimiter;
     private final HttpRequestHeaders headers;
     private final AtomicBoolean stopFlag = new AtomicBoolean(false);
+    private final ConcurrentLinkedQueue<RangeWorker> workers = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<CompletableFuture<Void>> futures = new ConcurrentLinkedQueue<>();
+    private final AtomicReference<Throwable> firstFailure = new AtomicReference<>();
+    private volatile ExecutorService pool;
 
     public MultiSegmentDownloader(String id, HttpClient client, URI uri, Path target,
                                   long totalSize, int segmentCount, ProgressBus bus, RateLimiter limiter) {
@@ -68,7 +74,20 @@ public final class MultiSegmentDownloader implements DownloadRunner {
         this.headers = headers == null ? HttpRequestHeaders.emptyHeaders() : headers;
     }
 
-    public void stop() { stopFlag.set(true); }
+    public void stop() {
+        stopFlag.set(true);
+        workers.forEach(RangeWorker::stop);
+        futures.forEach(f -> f.cancel(true));
+        ExecutorService currentPool = pool;
+        if (currentPool != null) currentPool.shutdownNow();
+    }
+
+    private void haltWorkers() {
+        stopFlag.set(true);
+        workers.forEach(RangeWorker::stop);
+        ExecutorService currentPool = pool;
+        if (currentPool != null) currentPool.shutdownNow();
+    }
 
     public void run() throws Exception {
         if (totalSize <= 0) {
@@ -79,11 +98,12 @@ public final class MultiSegmentDownloader implements DownloadRunner {
         List<Segment> initial = manager.snapshot();
         AtomicInteger mirrorCursor = new AtomicInteger();
 
-        ExecutorService pool = Executors.newFixedThreadPool(segmentCount);
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        pool = Executors.newFixedThreadPool(segmentCount);
+        List<CompletableFuture<Void>> running = new ArrayList<>();
         for (Segment seg : initial) {
             RangeWorker worker = new RangeWorker(id, client, uri, target, manager, progressBus,
                     stopFlag, rateLimiter, bufferSize, mirrors, mirrorCursor, headers);
+            workers.add(worker);
             CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
                 try {
                     worker.processAssigned(seg);
@@ -93,17 +113,27 @@ public final class MultiSegmentDownloader implements DownloadRunner {
                         worker.processAssigned(stolen);
                     }
                 } catch (Exception e) {
+                    firstFailure.compareAndSet(null, e);
+                    haltWorkers();
                     log.error("worker failed", e);
                     throw new RuntimeException(e);
+                } finally {
+                    workers.remove(worker);
                 }
             }, pool);
             futures.add(f);
+            running.add(f);
         }
 
         try {
-            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+            CompletableFuture.allOf(running.toArray(CompletableFuture[]::new)).join();
+        } catch (Exception e) {
+            Throwable failure = firstFailure.get();
+            if (failure instanceof Exception ex) throw ex;
+            if (failure != null) throw new RuntimeException(failure);
+            throw e;
         } finally {
-            pool.shutdown();
+            stop();
         }
     }
 
