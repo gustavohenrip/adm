@@ -214,11 +214,21 @@ export class QueueComponent implements OnInit {
   }
 
   onPause(id: string): void {
-    this.downloadsService.pause(id).subscribe((download) => this.mergeOne(download));
+    const current = this.downloads().find((d) => d.id === id);
+    if (current) this.store.mergeOne({ ...current, status: 'paused', speedBps: 0, etaSeconds: -1 });
+    this.downloadsService.pause(id).subscribe({
+      next: (download) => this.mergeOne(download),
+      error: () => { if (current) this.store.mergeOne(current); },
+    });
   }
 
   onResume(id: string): void {
-    this.downloadsService.resume(id).subscribe((download) => this.mergeOne(download));
+    const current = this.downloads().find((d) => d.id === id);
+    if (current) this.store.mergeOne({ ...current, status: 'queued' });
+    this.downloadsService.resume(id).subscribe({
+      next: (download) => this.mergeOne(download),
+      error: () => { if (current) this.store.mergeOne(current); },
+    });
   }
 
   onRefresh(payload: { id: string; url: string }): void {
@@ -232,9 +242,8 @@ export class QueueComponent implements OnInit {
   }
 
   onRemove(id: string): void {
-    this.downloadsService.remove(id).subscribe(() => {
-      this.store.removeLocal(id);
-    });
+    this.store.removeLocal(id);
+    this.downloadsService.remove(id).subscribe();
   }
 
   private reload(): void {

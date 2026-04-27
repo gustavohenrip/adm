@@ -59,6 +59,11 @@ public class TorrentDownloadService {
         t.setDaemon(true);
         return t;
     });
+    private final java.util.concurrent.ExecutorService asyncWork = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "odm-torrent-async");
+        t.setDaemon(true);
+        return t;
+    });
 
     public TorrentDownloadService(TorrentSession torrents, DownloadRepository repo, ProgressBus progressBus,
                                   RuntimeSettings settings, UrlGuard urlGuard, PersistenceGate persistenceGate) {
@@ -86,6 +91,7 @@ public class TorrentDownloadService {
     @PreDestroy
     public void stop() {
         monitor.shutdownNow();
+        asyncWork.shutdownNow();
     }
 
     public DownloadView create(TorrentCreateRequest req) throws Exception {
@@ -193,30 +199,57 @@ public class TorrentDownloadService {
     }
 
     public DownloadView pause(String id) {
-        DownloadEntity e = find(id);
-        torrents.pause(e.getSource());
-        e.setStatus(DownloadStatus.PAUSED);
-        save(e);
-        publish(e, 0L, -1L);
-        return DownloadView.from(e, 0L);
+        DownloadEntity snapshot = find(id);
+        String source = snapshot.getSource();
+        asyncWork.submit(() -> {
+            try {
+                torrents.pause(source);
+                repo.findById(id).ifPresent(e -> {
+                    e.setStatus(DownloadStatus.PAUSED);
+                    save(e);
+                    publish(e, 0L, -1L);
+                });
+            } catch (Throwable t) {
+                log.warn("async torrent pause failed for {}", id, t);
+            }
+        });
+        snapshot.setStatus(DownloadStatus.PAUSED);
+        return DownloadView.from(snapshot, 0L);
     }
 
     public DownloadView resume(String id) {
-        DownloadEntity e = find(id);
-        torrents.resume(e.getSource());
-        e.setStatus(DownloadStatus.DOWNLOADING);
-        save(e);
-        publish(e, 0L, -1L);
-        return DownloadView.from(e, 0L);
+        DownloadEntity snapshot = find(id);
+        String source = snapshot.getSource();
+        asyncWork.submit(() -> {
+            try {
+                torrents.resume(source);
+                repo.findById(id).ifPresent(e -> {
+                    e.setStatus(DownloadStatus.DOWNLOADING);
+                    save(e);
+                    publish(e, 0L, -1L);
+                });
+            } catch (Throwable t) {
+                log.warn("async torrent resume failed for {}", id, t);
+            }
+        });
+        snapshot.setStatus(DownloadStatus.DOWNLOADING);
+        return DownloadView.from(snapshot, 0L);
     }
 
     public void remove(String id, boolean deleteFiles) {
         DownloadEntity e = find(id);
-        if (repo.countByKindAndSourceIgnoreCaseAndIdNot(DownloadKind.TORRENT, e.getSource(), id) == 0L) {
-            torrents.remove(e.getSource(), deleteFiles);
-        }
-        delete(id);
+        String source = e.getSource();
         progressBus.reset(id);
+        asyncWork.submit(() -> {
+            try {
+                if (repo.countByKindAndSourceIgnoreCaseAndIdNot(DownloadKind.TORRENT, source, id) == 0L) {
+                    torrents.remove(source, deleteFiles);
+                }
+                delete(id);
+            } catch (Throwable t) {
+                log.warn("async torrent remove failed for {}", id, t);
+            }
+        });
     }
 
     private void refresh() {

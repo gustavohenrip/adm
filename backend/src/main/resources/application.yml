@@ -15,8 +15,15 @@ spring:
         dialect: org.hibernate.community.dialect.SQLiteDialect
         show_sql: false
   datasource:
-    url: jdbc:sqlite:${user.home}/.odm/odm.sqlite?busy_timeout=10000&journal_mode=WAL
+    url: jdbc:sqlite:${user.home}/.odm/odm.sqlite?busy_timeout=15000&journal_mode=WAL
     driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 3000
+      idle-timeout: 30000
+      max-lifetime: 600000
+      pool-name: odm-pool
   quartz:
     job-store-type: memory
 

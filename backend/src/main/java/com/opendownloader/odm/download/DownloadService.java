@@ -60,7 +60,7 @@ public class DownloadService {
     private final ScheduleRuleRepository scheduleRules;
     private final SystemEventsBroadcaster systemEvents;
     private final PersistenceGate persistenceGate;
-    private static final long STALL_TIMEOUT_NANOS = 45_000_000_000L;
+    private static final long STALL_TIMEOUT_NANOS = 20_000_000_000L;
     private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "odm-download-runner");
         t.setDaemon(true);
@@ -74,6 +74,8 @@ public class DownloadService {
     private final Map<String, DownloadRunner> active = new ConcurrentHashMap<>();
     private final Map<String, FutureHolder> runningTasks = new ConcurrentHashMap<>();
     private final Map<String, ProgressMark> progressMarks = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastFlushedBytes = new ConcurrentHashMap<>();
+    private static final long FLUSH_DELTA_BYTES = 1_048_576L;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DownloadService.class);
 
     public DownloadService(DownloadRepository repo, FileCategorizer categorizer, UrlGuard urlGuard,
@@ -203,15 +205,26 @@ public class DownloadService {
     }
 
     public DownloadView pause(String id) {
-        stopActive(id);
-        DownloadEntity e = find(id);
-        if (e.getStatus() == DownloadStatus.DOWNLOADING || e.getStatus() == DownloadStatus.QUEUED) {
-            e.setDownloadedBytes(progressBus.downloaded(id));
-            e.setStatus(DownloadStatus.PAUSED);
-            save(e);
-            publish(e);
-        }
-        return DownloadView.from(e, 0L);
+        DownloadEntity snapshot = find(id);
+        long currentBytes = progressBus.downloaded(id);
+        stopActiveAsync(id);
+        executor.submit(() -> {
+            try {
+                repo.findById(id).ifPresent(e -> {
+                    if (e.getStatus() == DownloadStatus.DOWNLOADING || e.getStatus() == DownloadStatus.QUEUED) {
+                        e.setDownloadedBytes(Math.max(e.getDownloadedBytes(), currentBytes));
+                        e.setStatus(DownloadStatus.PAUSED);
+                        save(e);
+                        publish(e);
+                    }
+                });
+            } catch (Throwable t) {
+                log.warn("async pause persist failed for {}", id, t);
+            }
+        });
+        snapshot.setStatus(DownloadStatus.PAUSED);
+        snapshot.setDownloadedBytes(Math.max(snapshot.getDownloadedBytes(), currentBytes));
+        return DownloadView.from(snapshot, 0L);
     }
 
     public DownloadView resume(String id) throws Exception {
@@ -253,16 +266,23 @@ public class DownloadService {
     }
 
     public void remove(String id, boolean deleteFiles) throws Exception {
-        stopActive(id);
         DownloadEntity e = find(id);
-        delete(id);
+        Path target = targetPath(e);
         progressBus.reset(id);
-        if (deleteFiles) {
+        stopActiveAsync(id);
+        executor.submit(() -> {
             try {
-                Files.deleteIfExists(targetPath(e));
-            } catch (Exception ignored) {
+                delete(id);
+                if (deleteFiles) {
+                    try {
+                        Files.deleteIfExists(target);
+                    } catch (Exception ignored) {
+                    }
+                }
+            } catch (Throwable t) {
+                log.warn("async remove persist failed for {}", id, t);
             }
-        }
+        });
     }
 
     public DownloadView view(String id) {
@@ -355,6 +375,7 @@ public class DownloadService {
         } finally {
             runningTasks.remove(id, holder);
             progressMarks.remove(id);
+            lastFlushedBytes.remove(id);
         }
     }
 
@@ -372,6 +393,23 @@ public class DownloadService {
         FutureHolder holder = runningTasks.remove(id);
         if (holder != null) holder.cancel();
         progressMarks.remove(id);
+        lastFlushedBytes.remove(id);
+    }
+
+    private void stopActiveAsync(String id) {
+        DownloadRunner job = active.remove(id);
+        FutureHolder holder = runningTasks.remove(id);
+        progressMarks.remove(id);
+        lastFlushedBytes.remove(id);
+        if (job == null && holder == null) return;
+        executor.submit(() -> {
+            try {
+                if (job != null) job.stop();
+                if (holder != null) holder.cancel();
+            } catch (Throwable t) {
+                log.warn("async stop failed for {}", id, t);
+            }
+        });
     }
 
     private boolean isRangeNotSupported(Throwable error) {
@@ -405,16 +443,30 @@ public class DownloadService {
     private void flushProgress() {
         for (String id : active.keySet()) {
             try {
-                repo.findById(id).ifPresent(e -> {
-                    long downloaded = Math.max(e.getDownloadedBytes(), progressBus.downloaded(id));
-                    e.setDownloadedBytes(downloaded);
-                    DownloadEntity saved = saveIfPresent(e);
-                    if (saved != null) publish(saved);
-                });
+                long current = progressBus.downloaded(id);
+                Long prev = lastFlushedBytes.get(id);
+                boolean shouldPersist = prev == null || current - prev >= FLUSH_DELTA_BYTES;
+                if (shouldPersist) {
+                    repo.findById(id).ifPresent(e -> {
+                        long downloaded = Math.max(e.getDownloadedBytes(), current);
+                        e.setDownloadedBytes(downloaded);
+                        DownloadEntity saved = saveIfPresent(e);
+                        if (saved != null) {
+                            lastFlushedBytes.put(id, downloaded);
+                            publish(saved);
+                        }
+                    });
+                } else {
+                    repo.findById(id).ifPresent(e -> {
+                        e.setDownloadedBytes(Math.max(e.getDownloadedBytes(), current));
+                        publish(e);
+                    });
+                }
             } catch (Throwable t) {
                 log.warn("progress flush failed for {}", id, t);
             }
         }
+        lastFlushedBytes.keySet().retainAll(active.keySet());
     }
 
     private void checkStalled() {
