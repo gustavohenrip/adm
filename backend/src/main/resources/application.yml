@@ -23,11 +23,16 @@ spring:
 odm:
   downloads:
     root: ${user.home}/Downloads/ODM
-    default-segments: 8
+    default-segments: 16
     max-segments: 32
+    buffer-bytes: 524288
+    min-split-bytes: 65536
+    dns-prefetch: true
+    tcp-prewarm: true
+    dynamic-chunk-size: true
     retry:
-      max-attempts: 5
-      initial-delay-ms: 500
+      max-attempts: 8
+      initial-delay-ms: 400
       max-delay-ms: 30000
   torrent:
     enabled: true
