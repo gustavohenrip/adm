@@ -70,6 +70,18 @@ public class DownloadEntity {
     @Column(name = "encrypted_credentials", length = 2048)
     private String encryptedCredentials;
 
+    @Column(name = "mirrors", length = 4096)
+    private String mirrors;
+
+    @Column(name = "checksum_algo", length = 16)
+    private String checksumAlgo;
+
+    @Column(name = "checksum_expected", length = 256)
+    private String checksumExpected;
+
+    @Column(name = "checksum_actual", length = 256)
+    private String checksumActual;
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public DownloadKind getKind() { return kind; }
@@ -104,4 +116,12 @@ public class DownloadEntity {
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public String getEncryptedCredentials() { return encryptedCredentials; }
     public void setEncryptedCredentials(String encryptedCredentials) { this.encryptedCredentials = encryptedCredentials; }
+    public String getMirrors() { return mirrors; }
+    public void setMirrors(String mirrors) { this.mirrors = mirrors; }
+    public String getChecksumAlgo() { return checksumAlgo; }
+    public void setChecksumAlgo(String checksumAlgo) { this.checksumAlgo = checksumAlgo; }
+    public String getChecksumExpected() { return checksumExpected; }
+    public void setChecksumExpected(String checksumExpected) { this.checksumExpected = checksumExpected; }
+    public String getChecksumActual() { return checksumActual; }
+    public void setChecksumActual(String checksumActual) { this.checksumActual = checksumActual; }
 }
