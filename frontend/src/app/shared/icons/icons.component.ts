@@ -15,6 +15,7 @@ export type IconName =
   | 'link'
   | 'trash'
   | 'arrow-down'
+  | 'arrow-left'
   | 'x'
   | 'refresh'
   | 'clock';
@@ -33,7 +34,7 @@ const PATHS: Record<IconName, string> = {
   more:
     '<circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18" cy="12" r="1.3" fill="currentColor"/>',
   settings:
-    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    '<path d="M19.4 13.5a7.5 7.5 0 000-3l2-1.55-2-3.46-2.36.94a7.5 7.5 0 00-2.6-1.5L14 2h-4l-.44 2.93a7.5 7.5 0 00-2.6 1.5L4.6 5.49l-2 3.46 2 1.55a7.5 7.5 0 000 3l-2 1.55 2 3.46 2.36-.94a7.5 7.5 0 002.6 1.5L10 22h4l.44-2.93a7.5 7.5 0 002.6-1.5l2.36.94 2-3.46-2-1.55z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.3"/>',
   sun:
     '<circle cx="12" cy="12" r="3.8" stroke="currentColor" stroke-width="1.3"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4L6.9 17M17.1 6.9L18.4 5.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
   moon:
@@ -44,6 +45,8 @@ const PATHS: Record<IconName, string> = {
     '<path d="M5 7h14M10 11v6M14 11v6M8 7l1-2h6l1 2M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
   'arrow-down':
     '<path d="M12 5v11m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  'arrow-left':
+    '<path d="M19 12H5m0 0l5-5m-5 5l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   x: '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   refresh:
     '<path d="M4 12a8 8 0 0114-5.3L20 5v5h-5M20 12a8 8 0 01-14 5.3L4 19v-5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',

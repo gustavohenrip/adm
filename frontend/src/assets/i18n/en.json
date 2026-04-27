@@ -22,7 +22,8 @@
     "pauseAll": "Pause all",
     "resumeAll": "Resume all",
     "bulk": "Bulk actions",
-    "refresh": "Refresh link"
+    "refresh": "Refresh link",
+    "back": "Back"
   },
   "sidebar": { "sessionSpeed": "Session speed" },
   "queue": {
@@ -90,18 +91,35 @@
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
+    "appearanceHint": "App theme and interface language",
     "theme": "Theme",
     "language": "Language",
     "downloads": "Downloads",
-    "downloadRoot": "Download folder",
+    "downloadsHint": "Default folder, segmentation and speed cap",
+    "downloadRoot": "Default folder",
     "defaultSegments": "Default segments",
-    "rateLimit": "Global rate limit",
+    "maxSegments": "Max segments",
+    "rateLimit": "Speed limit",
     "network": "Network",
+    "networkHint": "Proxy configuration",
     "proxy": "Proxy",
+    "proxyHost": "Host",
+    "proxyPort": "Port",
+    "torrentHint": "BitTorrent, DHT and local discovery",
+    "torrentEnabled": "Torrent downloads",
+    "torrentEnabledHint": "Enable magnet links and .torrent files",
+    "dhtHint": "Trackerless peer discovery",
+    "lsd": "Local discovery",
+    "lsdHint": "Find peers on the local network",
+    "listenPort": "Listen port",
     "system": "System",
-    "clipboard": "Detect URLs in clipboard",
-    "tray": "Show tray icon",
+    "systemHint": "Tray, clipboard and update behavior",
+    "clipboard": "Capture clipboard URLs",
+    "clipboardHint": "Detect copied links to open the intake",
+    "tray": "Tray icon",
+    "trayHint": "Keep ODM running in the background",
     "autoUpdate": "Auto-update",
-    "save": "Save changes"
+    "autoUpdateHint": "Download new versions in background",
+    "save": "Save"
   }
 }

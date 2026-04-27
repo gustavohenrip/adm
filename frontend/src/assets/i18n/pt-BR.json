@@ -22,7 +22,8 @@
     "pauseAll": "Pausar todos",
     "resumeAll": "Retomar todos",
     "bulk": "Ações em massa",
-    "refresh": "Religar link"
+    "refresh": "Religar link",
+    "back": "Voltar"
   },
   "sidebar": { "sessionSpeed": "Velocidade da sessão" },
   "queue": {
@@ -90,18 +91,35 @@
   "settings": {
     "title": "Configurações",
     "appearance": "Aparência",
+    "appearanceHint": "Tema do app e idioma da interface",
     "theme": "Tema",
     "language": "Idioma",
     "downloads": "Downloads",
-    "downloadRoot": "Pasta de downloads",
+    "downloadsHint": "Pasta padrão, segmentação e limite de velocidade",
+    "downloadRoot": "Pasta padrão",
     "defaultSegments": "Segmentos padrão",
-    "rateLimit": "Limite global de velocidade",
+    "maxSegments": "Segmentos máximos",
+    "rateLimit": "Limite de velocidade",
     "network": "Rede",
+    "networkHint": "Configurações de proxy",
     "proxy": "Proxy",
+    "proxyHost": "Host",
+    "proxyPort": "Porta",
+    "torrentHint": "BitTorrent, DHT e descoberta local",
+    "torrentEnabled": "Downloads BitTorrent",
+    "torrentEnabledHint": "Habilita magnet links e arquivos .torrent",
+    "dhtHint": "Descoberta de peers sem tracker",
+    "lsd": "Local discovery",
+    "lsdHint": "Encontra peers na rede local",
+    "listenPort": "Porta de escuta",
     "system": "Sistema",
-    "clipboard": "Detectar URLs na área de transferência",
-    "tray": "Exibir ícone na bandeja",
+    "systemHint": "Comportamentos de bandeja, área de transferência e atualização",
+    "clipboard": "Capturar URLs do clipboard",
+    "clipboardHint": "Detecta links copiados pra abrir o intake",
+    "tray": "Ícone na bandeja",
+    "trayHint": "Mantém ODM rodando em segundo plano",
     "autoUpdate": "Atualização automática",
-    "save": "Salvar alterações"
+    "autoUpdateHint": "Baixa novas versões em background",
+    "save": "Salvar"
   }
 }
