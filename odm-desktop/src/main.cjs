@@ -3,6 +3,7 @@ const path = require('node:path');
 const { startBackend, stopBackend, getBackendInfo } = require('./backend-sidecar.cjs');
 const clipboardWatcher = require('./clipboard-watcher.cjs');
 const tray = require('./tray.cjs');
+const nativeHost = require('./native-host-installer.cjs');
 
 const isDev = process.env.ODM_DEV === '1';
 let mainWindow = null;
@@ -60,6 +61,15 @@ app.whenReady().then(async () => {
     if (typeof folderPath !== 'string' || folderPath.length < 1) return;
     await shell.openPath(folderPath);
   });
+
+  try {
+    nativeHost.install({
+      scriptPath: path.join(__dirname, 'native-host.cjs'),
+      dataDir: path.join(app.getPath('userData'), 'browser-bridge'),
+    });
+  } catch (err) {
+    console.warn('[ODM] native host install skipped:', err && err.message);
+  }
 
   createWindow();
   tray.build(mainWindow, () => { quitting = true; app.quit(); });
